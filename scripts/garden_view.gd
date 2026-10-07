@@ -22,7 +22,7 @@ func _draw() -> void:
  meander(457, 20)
  draw_line(Vector2(0,480),Vector2(960,480),CLAY,1)
  if sim == null: return
- if int(sim.level.get("act",0))==1:
+ if int(sim.level.get("act",0))>=1:
   for i in range(22):
    draw_rect(Rect2(0,110+i*15,960,15),Color("b99472").lerp(Color("967252"),float(i)/22))
   for x in [100,420,810]:
@@ -49,24 +49,40 @@ func _draw() -> void:
   for bank in sim.level.banks:
    draw_rect(Rect2(bank[0],bank[1],bank[2],17),INK)
    draw_line(Vector2(bank[0],bank[1]),Vector2(bank[0]+bank[2],bank[1]),CREAM,2)
+ if sim.level.has("vessel_source"):
+  var spring: float=sim.level.vessel_source
+  var well: float=sim.level.vessel_target
+  draw_rect(Rect2(spring-26,413,52,27),Color("624b38"))
+  draw_line(Vector2(spring-20,417),Vector2(spring+20,417),CREAM,2)
+  draw_arc(Vector2(spring,392),18,PI,TAU,24,Color("624b38"),6,true)
+  draw_line(Vector2(spring,394),Vector2(spring,415),Color("91b3b0"),4)
+  draw_rect(Rect2(well-30,407,60,33),Color("624b38"))
+  draw_line(Vector2(well-26,412),Vector2(well+26,412),GOLD if sim.water_delivered else CREAM,3)
+  if sim.water_delivered: draw_circle(Vector2(well,430),7,GOLD)
+ if sim.level.has("plate"):
+  var plate_x: float=sim.level.plate[0]
+  draw_rect(Rect2(plate_x-32,435,64,5),GOLD if sim.world.receiver_active else Color("685440"))
+  draw_line(Vector2(plate_x-32,435),Vector2(plate_x+32,435),CREAM,2)
  for boat in sim.world.boats:
   var x: float=boat.x
   var y: float=boat.y
   var w: float=boat.w
   draw_colored_polygon(PackedVector2Array([Vector2(x-w/2,y),Vector2(x+w/2,y),Vector2(x+w/2-12,y+16),Vector2(x-w/2+12,y+16)]),INK)
   draw_line(Vector2(x-w/2+5,y+3),Vector2(x+w/2-5,y+3),CREAM,2)
-  draw_line(Vector2(x+25,y+3),Vector2(x+45,y+30),GOLD,3)
+  if boat.get("style","")=="wheel":
+   draw_circle(Vector2(x,y+39),38,INK)
+   draw_arc(Vector2(x,y+39),31,0,TAU,40,CREAM,2,true)
+   for spoke in range(6):
+    var angle: float=spoke*TAU/6+(0 if Settings.reduced_motion else seconds*0.5)
+    draw_line(Vector2(x,y+39),Vector2(x,y+39)+Vector2(cos(angle),sin(angle))*30,CREAM,1.5)
+  else: draw_line(Vector2(x+25,y+3),Vector2(x+45,y+30),GOLD,3)
+ if sim.level.has("light_receiver") or sim.level.has("plate") or sim.level.has("vessel_source"):
+  light_surfaces()
  if sim.level.has("light_receiver"):
   var x: float=sim.level.light_receiver[0]
   var color: Color=GOLD if sim.world.receiver_active else Color("69523e")
   draw_arc(Vector2(x,432),18,PI,TAU,24,color,3,true)
   draw_line(Vector2(x-20,440),Vector2(x+20,440),color,3)
-  for surface in sim.level.get("light_platforms",[]):
-   var rect:=Rect2(surface[0],surface[1],surface[2],10)
-   if sim.world.receiver_active:
-    draw_rect(rect,INK)
-    draw_line(rect.position,rect.position+Vector2(rect.size.x,0),GOLD,3)
-   else: draw_rect(rect,Color(0.95,0.85,0.7,0.28),false,1)
  for platform in sim.level.platforms:
   var rectangle := Rect2(platform[0], platform[1], platform[2], 12)
   draw_rect(rectangle, INK)
@@ -80,7 +96,7 @@ func _draw() -> void:
    var x: float = left+8+i*(right-left-16)/7
    var offset: float = 0.0 if Settings.reduced_motion else sin(seconds*3+i)*2
    draw_line(Vector2(x,sim.water_y+offset),Vector2(x+26,sim.water_y+offset),CREAM,1.4)
- if sim.level.rule in ["back", "eyes", "stone", "feast"] and not sim.level.has("banks"): tree()
+ if sim.level.rule in ["back", "eyes", "stone", "feast"] and not sim.level.has("banks") and int(sim.level.get("act",0))<2: tree()
  if sim.level.rule == "mirror":
   draw_line(Vector2(480,145),Vector2(480,440),Color(0.95,0.85,0.7,0.35),1)
   draw_circle(Vector2(480,434),8,CREAM)
@@ -93,6 +109,7 @@ func _draw() -> void:
   draw_line(center,center+Vector2(cos(angle),sin(angle))*26,CREAM,2)
  if sim.has_fruit and not sim.ate: fruit()
  person(sim.pos,sim.face,1.0)
+ if sim.vessel_carried: vessel()
  if sim.eyes:
   draw_rect(Rect2(0,110,960,330),Color(0.055,0.035,0.025,0.85))
   person(sim.pos,sim.face,0.65)
@@ -122,7 +139,7 @@ func tree() -> void:
   draw_line(p+Vector2(-7,0),p+Vector2(8,-3),CLAY,1)
 func fruit() -> void:
  var p: Vector2 = sim.fruit
- if sim.level.rule in ["mirror","shadow"] or (sim.level.has("banks") and not sim.level.has("guardian")): draw_line(Vector2(p.x,145),p-Vector2(0,13),INK,1)
+ if sim.level.rule in ["mirror","shadow"] or ((sim.level.has("banks") or int(sim.level.get("act",0))==2) and not sim.level.has("guardian")): draw_line(Vector2(p.x,145),p-Vector2(0,13),INK,1)
  draw_circle(p,14,INK)
  draw_arc(p,9,3.5,4.7,12,CREAM,1.5,true)
  draw_line(p-Vector2(0,12),p-Vector2(1,21),INK,3)
@@ -166,7 +183,7 @@ func torch() -> void:
  draw_set_transform(Vector2.ZERO)
 func cerberus() -> void:
  var x: float=sim.level.guardian
- if sim.level.has("banks"): draw_set_transform(Vector2(-maxf(0,x-870),-45))
+ if sim.level.has("banks") or x>870: draw_set_transform(Vector2(-maxf(0,x-870),-45))
  draw_rect(Rect2(x-66,340,138,10),INK)
  draw_line(Vector2(x-58,350),Vector2(x-58,376),INK,5)
  draw_line(Vector2(x+63,350),Vector2(x+63,376),INK,5)
@@ -189,3 +206,19 @@ func cerberus() -> void:
  if sim.noise>=0.65: draw_line(Vector2(x+82,350),Vector2(x+82,361),INK,3)
 
  draw_set_transform(Vector2.ZERO)
+
+func light_surfaces() -> void:
+ for surface in sim.level.get("light_platforms",[]):
+  var rect:=Rect2(surface[0],surface[1],surface[2],10)
+  if sim.world.receiver_active:
+   draw_rect(rect,INK)
+   draw_line(rect.position,rect.position+Vector2(rect.size.x,0),GOLD,3)
+  else: draw_rect(rect,Color(0.95,0.85,0.7,0.28),false,1)
+func vessel() -> void:
+ var center: Vector2=sim.pos+Vector2(13+sim.face*22,sim.height-17)
+ draw_circle(center,12,INK)
+ draw_arc(center,14,0,TAU,24,CREAM,1.2,true)
+ draw_rect(Rect2(center+Vector2(-5,-17),Vector2(10,9)),INK)
+ if sim.vessel_water>0:
+  var h: float=sim.vessel_water*17
+  draw_rect(Rect2(center+Vector2(-7,8-h),Vector2(14,h)),Color("91b3b0"))

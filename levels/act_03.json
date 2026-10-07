@@ -1,0 +1,222 @@
+[
+  {
+    "id": "danaids",
+    "act": 2,
+    "rule": "none",
+    "start": 100,
+    "platforms": [],
+    "vessel_source": 140,
+    "vessel_target": 760
+  },
+  {
+    "id": "leaking_light",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "vessel_source": 140,
+    "vessel_target": 700,
+    "fruit": [
+      800,
+      190
+    ],
+    "light_platforms": [
+      [
+        720,
+        350,
+        150
+      ]
+    ]
+  },
+  {
+    "id": "quiet_water",
+    "act": 2,
+    "rule": "none",
+    "start": 100,
+    "platforms": [],
+    "vessel_source": 140,
+    "vessel_target": 800,
+    "guardian": 680,
+    "guard_radius": 220
+  },
+  {
+    "id": "weight_of_promise",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "boulder": 220,
+    "plate": [
+      600,
+      40
+    ],
+    "fruit": [
+      820,
+      190
+    ],
+    "light_platforms": [
+      [
+        740,
+        350,
+        150
+      ]
+    ]
+  },
+  {
+    "id": "sisyphus_stairs",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "boulder": 200,
+    "plate": [
+      500,
+      40
+    ],
+    "fruit": [
+      820,
+      150
+    ],
+    "light_platforms": [
+      [
+        600,
+        350,
+        120
+      ],
+      [
+        750,
+        275,
+        140
+      ]
+    ]
+  },
+  {
+    "id": "stone_guard",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "boulder": 220,
+    "plate": [
+      600,
+      40
+    ],
+    "fruit": [
+      830,
+      390
+    ],
+    "guardian": 900,
+    "guard_radius": 160
+  },
+  {
+    "id": "ixion",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "fruit": [
+      450,
+      130
+    ],
+    "boats": [
+      {
+        "mode": "auto",
+        "style": "wheel",
+        "from": 450,
+        "to": 450,
+        "w": 150,
+        "y": 420,
+        "speed": 0,
+        "vertical": [
+          250,
+          420,
+          55
+        ]
+      }
+    ]
+  },
+  {
+    "id": "changing_circle",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "fruit": [
+      850,
+      305
+    ],
+    "banks": [
+      [
+        0,
+        440,
+        260
+      ],
+      [
+        720,
+        440,
+        240
+      ]
+    ],
+    "boats": [
+      {
+        "mode": "auto",
+        "style": "wheel",
+        "from": 310,
+        "to": 310,
+        "w": 150,
+        "y": 425,
+        "speed": 0,
+        "vertical": [
+          340,
+          425,
+          40
+        ]
+      },
+      {
+        "mode": "auto",
+        "from": 440,
+        "to": 710,
+        "w": 170,
+        "y": 345,
+        "speed": 80
+      }
+    ]
+  },
+  {
+    "id": "debt_of_gods",
+    "act": 2,
+    "rule": "eyes",
+    "start": 100,
+    "platforms": [],
+    "vessel_source": 130,
+    "vessel_target": 230,
+    "fruit": [
+      850,
+      390
+    ],
+    "banks": [
+      [
+        0,
+        440,
+        260
+      ],
+      [
+        720,
+        440,
+        240
+      ]
+    ],
+    "guardian": 900,
+    "guard_radius": 175,
+    "boats": [
+      {
+        "mode": "powered",
+        "from": 310,
+        "to": 710,
+        "w": 150,
+        "y": 425,
+        "speed": 100
+      }
+    ]
+  }
+]

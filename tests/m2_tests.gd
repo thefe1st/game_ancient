@@ -151,7 +151,7 @@ func run() -> void:
  key.pressed=false
  Input.parse_input_event(key.duplicate())
  game.update_hud()
- check(game.control_label.text.contains("Q"),"HUD reflects remapped key")
+ check(game.format_hint("{eyes}")=="Q","Help reflects remapped key")
  game.start_level(1)
  game.hint_visible=true
  game.update_hud()

@@ -21,6 +21,7 @@ var control_label: Label
 var gamepad: bool=false
 var pad_device: int=-1
 var settings_origin: String="menu"
+var controls_origin: String="menu"
 var binding_action: String=""
 var run_seconds: float=0.0
 var assisted_run: bool=false
@@ -169,6 +170,7 @@ func show_menu() -> void:
  var play_button:=button(box,Settings.text("play"),func(): start_level(SaveManager.unlocked),SaveManager.read_only)
  button(box,Settings.text("levels"),show_levels,SaveManager.read_only)
  button(box,Settings.text("slots"),show_slots)
+ button(box,Settings.text("controls_menu"),func(): show_controls("menu"))
  button(box,Settings.text("settings"),func(): show_settings("menu"))
  button(box,Settings.text("quit"),finish)
  if SaveManager.read_only or SaveManager.recovered_backup:
@@ -184,9 +186,9 @@ func show_levels(act: int=0) -> void:
  var box:=overlay(Settings.text("levels"))
  var tabs:=HBoxContainer.new()
  box.add_child(tabs)
- for i in range(2):
+ for i in range(3):
   var number: int=i
-  button(tabs,Settings.text("act_%d"%i),func(): show_levels(number),i==act)
+  button(tabs,Settings.text("act_short_%d"%i),func(): show_levels(number),i==act)
  var list:=scroll_box(box,264)
  for i in range(levels.size()):
   if int(levels[i].get("act",0))!=act: continue
@@ -215,6 +217,7 @@ func pause_menu() -> void:
  var box:=overlay(Settings.text("pause"),Settings.text("level_%d"%current))
  button(box,Settings.text("resume"),resume)
  button(box,Settings.text("restart"),func(): start_level(current))
+ button(box,Settings.text("controls_menu"),func(): show_controls("pause"))
  button(box,Settings.text("settings"),func(): show_settings("pause"))
  button(box,Settings.text("menu"),show_menu)
  focus_first(box)
@@ -263,6 +266,47 @@ func confirm_reset_slot() -> void:
  button(box,Settings.text("confirm"),func(): SaveManager.reset_active_slot(); show_slots())
  var cancel:=button(box,Settings.text("cancel"),show_slots)
  focus_later(cancel)
+func show_controls(origin: String="menu") -> void:
+ controls_origin=origin
+ screen="controls"
+ var box:=overlay(Settings.text("controls_menu"),Settings.text("controls_caption"))
+ var list:=scroll_box(box,260)
+ for key in ["torch_combo","vessel_controls"]:
+  var row:=Label.new()
+  row.text=format_hint(Settings.text(key))
+  row.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  row.custom_minimum_size.y=54
+  row.add_theme_font_size_override("font_size",20 if Settings.large_text else 18)
+  row.add_theme_color_override("font_color",Color("e9ae5b"))
+  row.focus_mode=Control.FOCUS_ALL
+  list.add_child(row)
+ for action in Settings.DEFAULT_BINDINGS:
+  var row:=Label.new()
+  row.text=Settings.text("action_"+str(action))+" — "+format_hint("{"+str(action)+"}")
+  row.custom_minimum_size.y=36
+  row.add_theme_font_size_override("font_size",20 if Settings.large_text else 18)
+  row.add_theme_color_override("font_color",Color("f3dcc0"))
+  row.focus_mode=Control.FOCUS_ALL
+  list.add_child(row)
+ var fixed:=Label.new()
+ fixed.text=Settings.text("pause_controls")
+ fixed.custom_minimum_size.y=36
+ fixed.add_theme_font_size_override("font_size",20 if Settings.large_text else 18)
+ fixed.add_theme_color_override("font_color",Color("e9ae5b"))
+ fixed.focus_mode=Control.FOCUS_ALL
+ list.add_child(fixed)
+ button(box,Settings.text("reset_controls_link"),func(): show_settings(controls_origin))
+ button(box,Settings.text("back"),leave_controls)
+ focus_controls_start(list.get_parent(),list.get_child(0))
+func focus_controls_start(scroll: ScrollContainer, first: Control) -> void:
+ await get_tree().process_frame
+ await get_tree().process_frame
+ if is_instance_valid(scroll) and is_instance_valid(first) and screen=="controls":
+  first.grab_focus()
+  scroll.scroll_vertical=0
+func leave_controls() -> void:
+ if controls_origin=="pause": pause_menu()
+ else: show_menu()
 func show_settings(origin: String="menu") -> void:
  settings_origin=origin
  screen="settings"
@@ -387,6 +431,7 @@ func _unhandled_input(event: InputEvent) -> void:
   if screen=="play": pause_menu()
   elif screen=="pause": resume()
   elif screen in ["settings","bindings"]: leave_settings()
+  elif screen=="controls": leave_controls()
   elif screen=="confirm_reset": show_slots()
   else: show_menu()
   get_viewport().set_input_as_handled()
@@ -423,17 +468,18 @@ func update_hud() -> void:
  if sim.level.has("torch") and sim.level.get("portable_torch",false): state=Settings.text("torch_carried" if sim.carried_torch else "light_on" if sim.world.receiver_active else "light_off")
  if sim.level.has("boats") and not sim.level.has("torch"): state=Settings.text("ferry_riding" if sim.support_boat>=0 else "ferry_waiting")
  if sim.level.has("boats") and sim.level.boats[0].get("mode","")=="auto": state=Settings.text("boats_moving")
+ if sim.level.has("boats") and sim.level.boats[0].has("vertical"): state=Settings.text("platforms_moving")
+ if sim.level.has("vessel_source"): state="%s %d%%"%[Settings.text("vessel_done" if sim.water_delivered else "vessel_fill"),int(sim.vessel_water*100)]
+ if sim.level.has("plate"): state=Settings.text("plate_on" if sim.world.receiver_active else "plate_off")
  if sim.level.has("guardian"): state="%s: %d%%"%[Settings.text("noise"),int(sim.noise*100)]
+ if sim.level.has("vessel_source") and sim.level.has("guardian"): state=Settings.text("water_noise")%[int(sim.vessel_water*100),int(sim.noise*100)]
  status.text="%s: %d\n%s"%[Settings.text("taunts"),sim.taunts,state]
  message.visible=taunt_timer>0
  message.text=toast if taunt_timer>0 else ""
  hint_label.visible=hint_visible
  hint_label.text=Settings.text("hint")+": "+format_hint(Settings.text("hint_%d"%current)) if hint_visible else ""
- var controls: String=Settings.text("keyboard_controls")
- for action in Settings.DEFAULT_BINDINGS: controls=controls.replace("{"+str(action)+"}",Settings.binding_label(action))
- if gamepad:
-  controls=Settings.text("pad_controls_ps" if is_playstation() else "pad_controls_xbox")
- control_label.text=controls
+ control_label.text=format_hint(Settings.text("minimal_controls"))
+ if gamepad: control_label.text=Settings.text("minimal_pad")
 
 func is_playstation() -> bool:
  var name: String=Input.get_joy_name(pad_device).to_lower()

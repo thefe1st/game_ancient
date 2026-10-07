@@ -43,6 +43,9 @@ var support_boat: int=-1
 var torch_x: float=0.0
 var carried_torch: bool=false
 var interaction_timer: float=0.0
+var vessel_carried: bool=false
+var vessel_water: float=0.0
+var water_delivered: bool=false
 func reset(data: Dictionary, number: int) -> void:
  level = data.duplicate(true)
  index = number
@@ -80,6 +83,9 @@ func reset(data: Dictionary, number: int) -> void:
  carried_torch=false
  torch_x=float(level.get("torch",0))
  interaction_timer=0.0
+ vessel_carried=false
+ vessel_water=0.0
+ water_delivered=false
  world.reset(level)
  update_light()
  events.clear()
@@ -100,6 +106,9 @@ func step(dt: float, input: Dictionary) -> void:
   return
  if input.get("interact",false) and level.has("torch"):
   interact_torch(bool(input.get("crouch",false)))
+ if input.get("interact",false) and level.has("vessel_source"): interact_vessel()
+ if vessel_carried and not bool(input.get("crouch",false)):
+  vessel_water=maxf(0,vessel_water-dt*float(level.get("leak",0.09)))
  update_light()
  var moving: bool=absf(float(input.get("move",0)))>0.05
  var quiet: bool=not moving or bool(input.get("crouch",false))
@@ -219,7 +228,7 @@ func step(dt: float, input: Dictionary) -> void:
     drank = true
     events.append("drink")
   else: drink_timer = maxf(0, drink_timer - dt)
- won = (not has_fruit or ate) and (not level.has("pool") or drank)
+ won = (not has_fruit or ate) and (not level.has("pool") or drank) and (not level.has("vessel_source") or water_delivered) and (not level.has("plate") or world.receiver_active)
  if won: events.append("win")
 
 func interact_torch(crouch_command: bool) -> void:
@@ -239,6 +248,8 @@ func update_light() -> void:
  if level.has("light_receiver") and torch_lit and not carried_torch:
   var receiver: Array=level.light_receiver
   world.receiver_active=absf(torch_x-float(receiver[0]))<=float(receiver[1])
+ if level.has("plate") and boulder>=0: world.receiver_active=absf(boulder-float(level.plate[0]))<=float(level.plate[1])
+ if level.has("vessel_source") and water_delivered: world.receiver_active=true
  if world.receiver_active and not was_active: events.append("light")
 func soft_respawn() -> void:
  # Retain collected rewards and placed lights; time/taunts do not reset.
@@ -255,3 +266,19 @@ func soft_respawn() -> void:
  idle=0.0
  if carried_torch: torch_x=clampf(pos.x+13+face*24,20,P.WIDTH-20)
  update_light()
+
+func interact_vessel() -> void:
+ if interaction_timer>0: return
+ var x: float=pos.x+13
+ if absf(x-float(level.vessel_source))<65:
+  vessel_carried=true
+  vessel_water=1.0
+  interaction_timer=0.2
+  events.append("drink")
+ elif vessel_carried and absf(x-float(level.vessel_target))<65:
+  interaction_timer=0.2
+  if vessel_water>=0.65:
+   water_delivered=true
+   vessel_carried=false
+   events.append("drink")
+  else: mock()

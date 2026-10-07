@@ -69,6 +69,7 @@ func create_hud() -> void:
  control_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  apply_hud_style()
 func apply_hud_style() -> void:
+ hint_label.size.y=128 if Settings.large_text else 108
  title.add_theme_font_size_override("font_size",32 if Settings.large_text else 28)
  subtitle.add_theme_font_size_override("font_size",18 if Settings.large_text else 16)
  status.add_theme_font_size_override("font_size",18 if Settings.large_text else 16)
@@ -419,7 +420,10 @@ func update_hud() -> void:
  subtitle.text=Settings.text("sub_%d"%current)
  var state: String=Settings.text("eyes_closed" if sim.eyes else "eyes_open")
  if sim.level.rule=="shadow": state=Settings.text("torch_on" if sim.torch_lit else "torch_off")
- if sim.level.rule=="noise": state="%s: %d%%"%[Settings.text("noise"),int(sim.noise*100)]
+ if sim.level.has("torch") and sim.level.get("portable_torch",false): state=Settings.text("torch_carried" if sim.carried_torch else "light_on" if sim.world.receiver_active else "light_off")
+ if sim.level.has("boats") and not sim.level.has("torch"): state=Settings.text("ferry_riding" if sim.support_boat>=0 else "ferry_waiting")
+ if sim.level.has("boats") and sim.level.boats[0].get("mode","")=="auto": state=Settings.text("boats_moving")
+ if sim.level.has("guardian"): state="%s: %d%%"%[Settings.text("noise"),int(sim.noise*100)]
  status.text="%s: %d\n%s"%[Settings.text("taunts"),sim.taunts,state]
  message.visible=taunt_timer>0
  message.text=toast if taunt_timer>0 else ""

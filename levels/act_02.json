@@ -22,5 +22,242 @@
     ],
     "platforms": [],
     "guardian": 680
+  },
+  {
+    "id": "charon",
+    "act": 1,
+    "rule": "eyes",
+    "start": 110,
+    "fruit": [
+      850,
+      305
+    ],
+    "platforms": [],
+    "banks": [
+      [
+        0,
+        440,
+        260
+      ],
+      [
+        720,
+        440,
+        240
+      ]
+    ],
+    "boats": [
+      {
+        "from": 310,
+        "to": 710,
+        "w": 150,
+        "y": 425,
+        "speed": 100,
+        "mode": "ferry"
+      }
+    ]
+  },
+  {
+    "id": "borrowed_light",
+    "act": 1,
+    "rule": "back",
+    "start": 100,
+    "fruit": [
+      740,
+      190
+    ],
+    "platforms": [],
+    "torch": 190,
+    "portable_torch": true,
+    "light_receiver": [
+      460,
+      42
+    ],
+    "light_platforms": [
+      [
+        660,
+        350,
+        150
+      ]
+    ]
+  },
+  {
+    "id": "quiet_ferry",
+    "act": 1,
+    "rule": "none",
+    "start": 110,
+    "fruit": [
+      850,
+      390
+    ],
+    "platforms": [],
+    "banks": [
+      [
+        0,
+        440,
+        260
+      ],
+      [
+        720,
+        440,
+        240
+      ]
+    ],
+    "guardian": 900,
+    "guard_radius": 175,
+    "boats": [
+      {
+        "from": 310,
+        "to": 710,
+        "w": 150,
+        "y": 425,
+        "speed": 100,
+        "mode": "ferry"
+      }
+    ]
+  },
+  {
+    "id": "light_reflection",
+    "act": 1,
+    "rule": "mirror",
+    "start": 110,
+    "fruit": [
+      850,
+      190
+    ],
+    "platforms": [],
+    "torch": 200,
+    "portable_torch": true,
+    "light_receiver": [
+      380,
+      38
+    ],
+    "light_platforms": [
+      [
+        420,
+        350,
+        120
+      ]
+    ]
+  },
+  {
+    "id": "last_drink",
+    "act": 1,
+    "rule": "eyes",
+    "start": 110,
+    "fruit": [
+      850,
+      305
+    ],
+    "platforms": [],
+    "pool": [
+      50,
+      245
+    ],
+    "banks": [
+      [
+        0,
+        440,
+        260
+      ],
+      [
+        720,
+        440,
+        240
+      ]
+    ],
+    "boats": [
+      {
+        "from": 310,
+        "to": 710,
+        "w": 150,
+        "y": 425,
+        "speed": 100,
+        "mode": "ferry"
+      }
+    ]
+  },
+  {
+    "id": "two_shores",
+    "act": 1,
+    "rule": "none",
+    "start": 100,
+    "fruit": [
+      860,
+      305
+    ],
+    "platforms": [],
+    "banks": [
+      [
+        0,
+        440,
+        200
+      ],
+      [
+        800,
+        440,
+        160
+      ]
+    ],
+    "boats": [
+      {
+        "from": 240,
+        "to": 460,
+        "w": 130,
+        "y": 410,
+        "speed": 90,
+        "mode": "auto"
+      },
+      {
+        "from": 520,
+        "to": 770,
+        "w": 150,
+        "y": 380,
+        "speed": 100,
+        "mode": "auto",
+        "start": 730,
+        "direction": -1
+      }
+    ]
+  },
+  {
+    "id": "night_crossing",
+    "act": 1,
+    "rule": "eyes",
+    "start": 100,
+    "fruit": [
+      850,
+      390
+    ],
+    "platforms": [],
+    "torch": 170,
+    "portable_torch": true,
+    "light_receiver": [
+      240,
+      38
+    ],
+    "banks": [
+      [
+        0,
+        440,
+        260
+      ],
+      [
+        720,
+        440,
+        240
+      ]
+    ],
+    "guardian": 900,
+    "guard_radius": 175,
+    "boats": [
+      {
+        "from": 310,
+        "to": 710,
+        "w": 150,
+        "y": 425,
+        "speed": 100,
+        "mode": "powered"
+      }
+    ]
   }
 ]

@@ -29,15 +29,44 @@ func _draw() -> void:
    draw_arc(Vector2(x,290),116,PI,TAU,36,Color(0.10,0.06,0.04,0.17),12,true)
    draw_line(Vector2(x-116,290),Vector2(x-116,440),Color(0.10,0.06,0.04,0.17),12)
    draw_line(Vector2(x+116,290),Vector2(x+116,440),Color(0.10,0.06,0.04,0.17),12)
+ if sim.level.has("torch"): torch()
  if sim.level.rule=="shadow":
-  torch()
   if sim.torch_lit:
    var hero_x: float=sim.pos.x+13
-   var side: float=1.0 if hero_x>=float(sim.level.torch) else -1.0
+   var side: float=1.0 if hero_x>=sim.torch_x else -1.0
    var tip: float=clampf(hero_x+side*240,20,940)
    draw_colored_polygon(PackedVector2Array([Vector2(hero_x-10,440),Vector2(hero_x+10,440),Vector2(tip+30,342),Vector2(tip-22,342)]),Color(0.10,0.06,0.04,0.72))
    draw_circle(Vector2(tip,317),22,Color(0.10,0.06,0.04,0.72))
- if sim.level.rule=="noise": cerberus()
+ if sim.level.has("guardian"): cerberus()
+ if sim.level.has("banks"):
+  var left: float=sim.level.banks[0][2]
+  var right: float=sim.level.banks[1][0]
+  draw_rect(Rect2(left,435,right-left,45),Color("395257"))
+  for i in range(12):
+   var x: float=left+i*(right-left)/12
+   var drift: float=0 if Settings.reduced_motion else sin(seconds*2+i)*2
+   draw_line(Vector2(x,444+drift),Vector2(x+18,444+drift),Color("91a6a0"),1)
+  for bank in sim.level.banks:
+   draw_rect(Rect2(bank[0],bank[1],bank[2],17),INK)
+   draw_line(Vector2(bank[0],bank[1]),Vector2(bank[0]+bank[2],bank[1]),CREAM,2)
+ for boat in sim.world.boats:
+  var x: float=boat.x
+  var y: float=boat.y
+  var w: float=boat.w
+  draw_colored_polygon(PackedVector2Array([Vector2(x-w/2,y),Vector2(x+w/2,y),Vector2(x+w/2-12,y+16),Vector2(x-w/2+12,y+16)]),INK)
+  draw_line(Vector2(x-w/2+5,y+3),Vector2(x+w/2-5,y+3),CREAM,2)
+  draw_line(Vector2(x+25,y+3),Vector2(x+45,y+30),GOLD,3)
+ if sim.level.has("light_receiver"):
+  var x: float=sim.level.light_receiver[0]
+  var color: Color=GOLD if sim.world.receiver_active else Color("69523e")
+  draw_arc(Vector2(x,432),18,PI,TAU,24,color,3,true)
+  draw_line(Vector2(x-20,440),Vector2(x+20,440),color,3)
+  for surface in sim.level.get("light_platforms",[]):
+   var rect:=Rect2(surface[0],surface[1],surface[2],10)
+   if sim.world.receiver_active:
+    draw_rect(rect,INK)
+    draw_line(rect.position,rect.position+Vector2(rect.size.x,0),GOLD,3)
+   else: draw_rect(rect,Color(0.95,0.85,0.7,0.28),false,1)
  for platform in sim.level.platforms:
   var rectangle := Rect2(platform[0], platform[1], platform[2], 12)
   draw_rect(rectangle, INK)
@@ -51,7 +80,7 @@ func _draw() -> void:
    var x: float = left+8+i*(right-left-16)/7
    var offset: float = 0.0 if Settings.reduced_motion else sin(seconds*3+i)*2
    draw_line(Vector2(x,sim.water_y+offset),Vector2(x+26,sim.water_y+offset),CREAM,1.4)
- if sim.level.rule in ["back", "eyes", "stone", "feast"]: tree()
+ if sim.level.rule in ["back", "eyes", "stone", "feast"] and not sim.level.has("banks"): tree()
  if sim.level.rule == "mirror":
   draw_line(Vector2(480,145),Vector2(480,440),Color(0.95,0.85,0.7,0.35),1)
   draw_circle(Vector2(480,434),8,CREAM)
@@ -74,6 +103,10 @@ func _draw() -> void:
     draw_circle(sim.fruit+Vector2(cos(angle)*22,sin(angle)*14),1.4,Color(0.95,0.85,0.7,0.7))
   if sim.level.has("pool"):
    draw_line(Vector2(sim.level.pool[0],sim.water_y),Vector2(sim.level.pool[1],sim.water_y),Color(0.95,0.85,0.7,0.65),1.5)
+ # Mask falling actors beneath the river and keep the controls unobstructed.
+ draw_rect(Rect2(0,457,960,83),INK)
+ meander(457,20)
+ draw_line(Vector2(0,480),Vector2(960,480),CLAY,1)
 func meander(y: float, height: float) -> void:
  draw_rect(Rect2(0,y,960,height),INK)
  for i in range(32):
@@ -89,7 +122,7 @@ func tree() -> void:
   draw_line(p+Vector2(-7,0),p+Vector2(8,-3),CLAY,1)
 func fruit() -> void:
  var p: Vector2 = sim.fruit
- if sim.level.rule in ["mirror","shadow"]: draw_line(Vector2(p.x,145),p-Vector2(0,13),INK,1)
+ if sim.level.rule in ["mirror","shadow"] or (sim.level.has("banks") and not sim.level.has("guardian")): draw_line(Vector2(p.x,145),p-Vector2(0,13),INK,1)
  draw_circle(p,14,INK)
  draw_arc(p,9,3.5,4.7,12,CREAM,1.5,true)
  draw_line(p-Vector2(0,12),p-Vector2(1,21),INK,3)
@@ -117,7 +150,9 @@ func person(p: Vector2, facing: int, opacity: float) -> void:
  else: draw_circle(head+Vector2(facing*6,-1),1.3,detail)
 
 func torch() -> void:
- var x: float=sim.level.torch
+ var x: float=sim.torch_x
+ var base: float=sim.pos.y+sim.height-8 if sim.carried_torch else 430.0
+ draw_set_transform(Vector2(0,base-430))
  draw_line(Vector2(x,430),Vector2(x,364),INK,7)
  draw_arc(Vector2(x,359),13,0,PI,20,INK,5,true)
  if sim.torch_lit:
@@ -128,8 +163,10 @@ func torch() -> void:
  else:
   draw_line(Vector2(x-10,345),Vector2(x+10,345),INK,2)
   draw_circle(Vector2(x,356),4,CREAM)
+ draw_set_transform(Vector2.ZERO)
 func cerberus() -> void:
  var x: float=sim.level.guardian
+ if sim.level.has("banks"): draw_set_transform(Vector2(-maxf(0,x-870),-45))
  draw_rect(Rect2(x-66,340,138,10),INK)
  draw_line(Vector2(x-58,350),Vector2(x-58,376),INK,5)
  draw_line(Vector2(x+63,350),Vector2(x+63,376),INK,5)
@@ -150,3 +187,5 @@ func cerberus() -> void:
  draw_rect(Rect2(x-66,354,138,13),INK)
  draw_rect(Rect2(x-64,356,134*sim.noise,9),GOLD if sim.noise<0.65 else Color("cc5838"))
  if sim.noise>=0.65: draw_line(Vector2(x+82,350),Vector2(x+82,361),INK,3)
+
+ draw_set_transform(Vector2.ZERO)

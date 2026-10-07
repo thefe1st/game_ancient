@@ -26,7 +26,7 @@ func _initialize() -> void:
  call_deferred("run")
 func run() -> void:
  levels = Catalog.load_levels()
- check(levels.size()==9,"Nine levels")
+ check(levels.size()==16,"Sixteen levels")
  check(Rules.fruit_flees("back",100,100,1,false,false),"Looking at fruit makes it flee")
  check(not Rules.fruit_flees("back",100,100,-1,false,false),"Facing away is safe")
  check(not Rules.fruit_flees("eyes",100,100,1,true,false),"Closed eyes are safe")

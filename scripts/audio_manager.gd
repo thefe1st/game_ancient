@@ -44,6 +44,8 @@ func synth(event: String) -> AudioStreamWAV:
   "taunt": duration = 0.65
   "eat": duration = 0.12
   "drink": duration = 0.4
+  "splash": duration=0.4; frequency=130
+  "light": duration=0.5; frequency=440
   "torch": duration=0.25; frequency=90
   "bark": duration=0.35; frequency=100
   "eyes": frequency = 180
@@ -60,6 +62,8 @@ func synth(event: String) -> AudioStreamWAV:
   var wave: float = sin(TAU * frequency * t)
   match event:
    "bark": wave=sin(TAU*100*t)*sin(TAU*17*t); envelope=exp(-t*7)
+   "splash": wave=sin(float(i)*153.3)*cos(float(i)*53.1); envelope=exp(-t*6)
+   "light": wave=sin(TAU*440*t)+0.2*sin(TAU*660*t); envelope=exp(-t*5)
    "torch": wave=sin(float(i)*183.7)*cos(float(i)*42.3); envelope=exp(-t*8)
    "jump": wave = sin(TAU * (260 * t + 650 * t * t))
    "taunt": wave = sin(TAU * (170 * t - 35 * t * t)); envelope = maxf(0, sin(t * 40)) * exp(-t * 3)

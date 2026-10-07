@@ -38,7 +38,7 @@ func run() -> void:
  var config:=ConfigFile.new()
  check(config.load(save.slot_path(save.active_slot))==OK,"Saved file can be loaded")
  check(config.get_value("progress","unlocked",-1)==save.unlocked,"Saved unlock matches memory")
- game.start_level(8)
+ game.start_level(game.levels.size()-1)
  game.sim.elapsed=12.3
  game.show_win()
  await process_frame

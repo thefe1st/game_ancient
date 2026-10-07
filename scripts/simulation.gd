@@ -2,6 +2,7 @@ extends RefCounted
 # Deterministic platform solver, with explicit one-way surfaces. No rendering or input APIs.
 const P = preload("res://scripts/physics_config.gd")
 const Rules = preload("res://scripts/rules.gd")
+const PlatformWorld = preload("res://scripts/platform_world.gd")
 var level: Dictionary
 var index: int
 var pos := Vector2.ZERO
@@ -37,6 +38,11 @@ var footstep: float = 0.0
 var torch_lit: bool = true
 var noise: float = 0.0
 var alert_time: float = 0.0
+var world=PlatformWorld.new()
+var support_boat: int=-1
+var torch_x: float=0.0
+var carried_torch: bool=false
+var interaction_timer: float=0.0
 func reset(data: Dictionary, number: int) -> void:
  level = data.duplicate(true)
  index = number
@@ -70,9 +76,15 @@ func reset(data: Dictionary, number: int) -> void:
  torch_lit=true
  noise=0.0
  alert_time=0.0
+ support_boat=-1
+ carried_torch=false
+ torch_x=float(level.get("torch",0))
+ interaction_timer=0.0
+ world.reset(level)
+ update_light()
  events.clear()
-func mock() -> void:
- if taunt_cooldown <= 0:
+func mock(force: bool=false) -> void:
+ if force or taunt_cooldown <= 0:
   taunts += 1
   events.append("taunt")
   taunt_cooldown = 1.5
@@ -81,21 +93,21 @@ func step(dt: float, input: Dictionary) -> void:
  if won: return
  elapsed += dt
  taunt_cooldown -= dt
+ interaction_timer=maxf(0,interaction_timer-dt)
  if alert_time>0:
   alert_time=maxf(0,alert_time-dt)
-  if alert_time<=0:
-   pos=Vector2(float(level.start),P.FLOOR-P.BODY_SIZE.y)
-   vel=Vector2.ZERO
-   grounded=true
-   height=P.BODY_SIZE.y
-   crouch=false
-   noise=0.0
-   coyote=P.COYOTE_TIME
-   buffer=0.0
+  if alert_time<=0: soft_respawn()
   return
- if input.get("interact",false) and level.has("torch") and absf(pos.x+13-float(level.torch))<60:
-  torch_lit=not torch_lit
-  events.append("torch")
+ if input.get("interact",false) and level.has("torch"):
+  interact_torch(bool(input.get("crouch",false)))
+ update_light()
+ var moving: bool=absf(float(input.get("move",0)))>0.05
+ var quiet: bool=not moving or bool(input.get("crouch",false))
+ if input.get("jump",false): quiet=false
+ world.advance(dt,support_boat if grounded else -1,quiet,world.receiver_active)
+ if grounded and support_boat>=0 and support_boat<world.boats.size():
+  var boat: Dictionary=world.boats[support_boat]
+  pos+=Vector2(boat.dx,boat.dy)
  if input.get("eyes", false):
   eyes = not eyes
   events.append("eyes")
@@ -136,19 +148,27 @@ func step(dt: float, input: Dictionary) -> void:
  var previous_feet: float = pos.y + height
  pos.y += vel.y * dt
  grounded = false
- var surfaces: Array = [[0, P.FLOOR, P.WIDTH]]
- surfaces.append_array(level.platforms)
- if boulder >= 0: surfaces.append([boulder - 30, P.FLOOR - 76, 60])
+ support_boat=-1
+ var surfaces: Array[Dictionary]=world.surfaces(level)
+ if boulder>=0: surfaces.append({"x":boulder-30,"w":60.0,"y":P.FLOOR-76,"boat":-1})
  for surface in surfaces:
-  if vel.y >= 0 and previous_feet <= float(surface[1]) + 0.5 and pos.y + height >= float(surface[1]) and pos.x + 26 > float(surface[0]) and pos.x < float(surface[0]) + float(surface[2]):
-   pos.y = float(surface[1]) - height
-   vel.y = 0.0
-   grounded = true
+  if vel.y>=0 and previous_feet<=surface.y+0.5 and pos.y+height>=surface.y and pos.x+26>surface.x and pos.x<surface.x+surface.w:
+   pos.y=surface.y-height
+   vel.y=0.0
+   grounded=true
+   support_boat=surface.boat
+ if level.has("banks") and pos.y>P.FLOOR+80:
+  mock(true)
+  events.append("splash")
+  soft_respawn()
+  return
+ if carried_torch: torch_x=clampf(pos.x+13+face*24,20,P.WIDTH-20)
+ update_light()
  var center := pos + Vector2(13, height / 2)
- if level.rule=="noise":
+ if level.has("guardian"):
   var target_noise: float=Rules.noise_target(absf(direction)>0.05,crouch,not grounded)
   noise=move_toward(noise,target_noise,dt*1.8)
-  if absf(center.x-float(level.guardian))<340 and noise>=0.65:
+  if absf(center.x-float(level.guardian))<float(level.get("guard_radius",340)) and noise>=0.65:
    alert_time=0.65
    mock()
    events.append("bark")
@@ -156,13 +176,13 @@ func step(dt: float, input: Dictionary) -> void:
  if has_fruit and not ate:
   var distance: float = fruit.distance_to(center)
   var flee: bool = Rules.fruit_flees(level.rule, distance - (150.0 if fleeing else 0.0), fruit.x - center.x, face, eyes, crouch)
-  if level.rule=="shadow": flee=Rules.shadow_flees(center.x,home.x,float(level.torch),torch_lit)
+  if level.rule=="shadow": flee=Rules.shadow_flees(center.x,home.x,torch_x,torch_lit)
   if flee and not fleeing: mock()
   fleeing = flee
   var target: Vector2 = home
   var speed: float = 120.0
   if level.rule == "mirror":
-   target = Vector2(P.WIDTH - center.x, 300)
+   target = Vector2(P.WIDTH - center.x, home.y)
    speed = 330.0
   elif level.rule == "sneak":
    target = fruit
@@ -201,3 +221,37 @@ func step(dt: float, input: Dictionary) -> void:
   else: drink_timer = maxf(0, drink_timer - dt)
  won = (not has_fruit or ate) and (not level.has("pool") or drank)
  if won: events.append("win")
+
+func interact_torch(crouch_command: bool) -> void:
+ if interaction_timer>0: return
+ if not carried_torch and absf(pos.x+13-torch_x)>=60: return
+ interaction_timer=0.18
+ if not level.get("portable_torch",false): torch_lit=not torch_lit
+ elif crouch_command: torch_lit=not torch_lit
+ elif carried_torch: carried_torch=false
+ else:
+  carried_torch=true
+  torch_x=clampf(pos.x+13+face*24,20,P.WIDTH-20)
+ events.append("torch")
+func update_light() -> void:
+ var was_active: bool=world.receiver_active
+ world.receiver_active=false
+ if level.has("light_receiver") and torch_lit and not carried_torch:
+  var receiver: Array=level.light_receiver
+  world.receiver_active=absf(torch_x-float(receiver[0]))<=float(receiver[1])
+ if world.receiver_active and not was_active: events.append("light")
+func soft_respawn() -> void:
+ # Retain collected rewards and placed lights; time/taunts do not reset.
+ pos=Vector2(float(level.start),P.FLOOR-P.BODY_SIZE.y)
+ vel=Vector2.ZERO
+ height=P.BODY_SIZE.y
+ grounded=true
+ crouch=false
+ support_boat=-1
+ noise=0.0
+ coyote=P.COYOTE_TIME
+ buffer=0.0
+ drink_timer=0.0
+ idle=0.0
+ if carried_torch: torch_x=clampf(pos.x+13+face*24,20,P.WIDTH-20)
+ update_light()

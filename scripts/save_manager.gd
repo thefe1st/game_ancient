@@ -84,11 +84,11 @@ func load_slot(slot: int) -> void:
   total_taunts=data.taunts
   best_times=data.times
   assisted_times=data.assisted_times
- if migrating:
-  # M1 capped unlocked at 6 even after winning the seventh/final trial.
-  # A recorded completion proves the next chapter can open immediately.
-  if level_count>7 and unlocked>=6 and best_times.has("6"): unlocked=maxi(unlocked,7)
-  flush()
+  # Earlier versions capped unlocked at their last level. A completion record
+  # opens the appended trial without making the user replay the old finale.
+  for times in [best_times,assisted_times]:
+   for key in times: unlocked=maxi(unlocked,mini(int(key)+1,level_count-1))
+ if migrating: flush()
 func select_slot(slot: int) -> Error:
  if slot<0 or slot>2: return ERR_INVALID_PARAMETER
  load_slot(slot)

@@ -36,9 +36,9 @@ func run() -> void:
  check(save.unlocked>=1,"Victory unlocks next level")
  check(save.best_times.has("0"),"Best time stored")
  var config:=ConfigFile.new()
- check(config.load("user://progress.cfg")==OK,"Saved file can be loaded")
+ check(config.load(save.slot_path(save.active_slot))==OK,"Saved file can be loaded")
  check(config.get_value("progress","unlocked",-1)==save.unlocked,"Saved unlock matches memory")
- game.start_level(6)
+ game.start_level(8)
  game.sim.elapsed=12.3
  game.show_win()
  await process_frame

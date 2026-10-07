@@ -1,0 +1,26 @@
+[
+  {
+    "id": "shadow",
+    "act": 1,
+    "rule": "shadow",
+    "start": 100,
+    "fruit": [
+      740,
+      305
+    ],
+    "platforms": [],
+    "torch": 220
+  },
+  {
+    "id": "cerberus",
+    "act": 1,
+    "rule": "noise",
+    "start": 120,
+    "fruit": [
+      840,
+      424
+    ],
+    "platforms": [],
+    "guardian": 680
+  }
+]

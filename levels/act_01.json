@@ -7,7 +7,8 @@
       720,
       305
     ],
-    "platforms": []
+    "platforms": [],
+    "act": 0
   },
   {
     "id": "gaze",
@@ -23,7 +24,8 @@
         350,
         150
       ]
-    ]
+    ],
+    "act": 0
   },
   {
     "id": "thirst",
@@ -33,7 +35,8 @@
       330,
       640
     ],
-    "platforms": []
+    "platforms": [],
+    "act": 0
   },
   {
     "id": "escape",
@@ -43,7 +46,8 @@
       760,
       424
     ],
-    "platforms": []
+    "platforms": [],
+    "act": 0
   },
   {
     "id": "reflection",
@@ -53,7 +57,8 @@
       840,
       300
     ],
-    "platforms": []
+    "platforms": [],
+    "act": 0
   },
   {
     "id": "stone",
@@ -64,7 +69,8 @@
       225
     ],
     "boulder": 200,
-    "platforms": []
+    "platforms": [],
+    "act": 0
   },
   {
     "id": "feast",
@@ -78,6 +84,7 @@
       330,
       640
     ],
-    "platforms": []
+    "platforms": [],
+    "act": 0
   }
 ]

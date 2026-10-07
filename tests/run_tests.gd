@@ -1,5 +1,6 @@
 extends SceneTree
 const Simulation = preload("res://scripts/simulation.gd")
+const Catalog = preload("res://scripts/level_catalog.gd")
 const Rules = preload("res://scripts/rules.gd")
 var failures: int = 0
 var checks: int = 0
@@ -24,8 +25,8 @@ func jump(sim: RefCounted, direction: float = 0) -> void:
 func _initialize() -> void:
  call_deferred("run")
 func run() -> void:
- levels = JSON.parse_string(FileAccess.get_file_as_string("res://levels/act_01.json"))
- check(levels.size()==7,"Seven levels")
+ levels = Catalog.load_levels()
+ check(levels.size()==9,"Nine levels")
  check(Rules.fruit_flees("back",100,100,1,false,false),"Looking at fruit makes it flee")
  check(not Rules.fruit_flees("back",100,100,-1,false,false),"Facing away is safe")
  check(not Rules.fruit_flees("eyes",100,100,1,true,false),"Closed eyes are safe")
@@ -35,7 +36,7 @@ func run() -> void:
  check(Rules.water_target(false,false,true,3)==402,"Outside pool does not drink")
  for fps in [30,60,120]:
   dt=1.0/fps
-  for index in range(7): solve(index,fps)
+  for index in range(9): solve(index,fps)
  dt=1.0/60
  var s = Simulation.new()
  s.reset(levels[0],0)
@@ -71,6 +72,24 @@ func run() -> void:
  check(not s.won and s.taunts>0,"Crouching cannot solve thirst")
  s.reset(levels[0],0)
  check(s.taunts==0 and not s.eyes and s.grounded and s.hop_time<0,"Reset clears state")
+ s.reset(levels[7],7)
+ s.step(dt,{"interact":true})
+ check(s.torch_lit,"Cannot use distant torch")
+ move_to(s,200)
+ s.step(dt,{"interact":true})
+ check(not s.torch_lit,"Near torch toggles")
+ check(Rules.shadow_flees(540,740,220,true),"Shadow reaches fruit")
+ check(not Rules.shadow_flees(540,740,220,false),"Darkness removes shadow")
+ s.reset(levels[7],7)
+ s.step(dt,{"eyes":true})
+ move_to(s,690)
+ frames(s,0.5)
+ check(s.fleeing and not s.won,"Closing eyes does not hide shadow")
+ s.reset(levels[8],8)
+ frames(s,2.0,{"move":1})
+ check(s.taunts>0 and not s.won,"Loud walking wakes Cerberus")
+ frames(s,1.0)
+ check(s.pos.x<340 and s.alert_time<=0,"Cerberus sends hero back safely")
  var russian = JSON.parse_string(FileAccess.get_file_as_string("res://localization/ru.json"))
  var english = JSON.parse_string(FileAccess.get_file_as_string("res://localization/en.json"))
  check(russian.keys().size()==english.keys().size(),"Locale key counts match")
@@ -119,5 +138,13 @@ func solve(index: int, fps: int) -> void:
    frames(s,8)
    jump(s)
    frames(s,0.7)
+  7:
+   move_to(s,200)
+   s.step(dt,{"interact":true})
+   move_to(s,727)
+   jump(s)
+   frames(s,0.7)
+  8:
+   move_to(s,840,{"crouch":true})
  check(s.won,"Solution level %d at %d FPS (pos=%s fruit=%s ate=%s drank=%s)" % [index+1,fps,s.pos,s.fruit,s.ate,s.drank])
  if s.won: print("PASS level %d @ %d FPS, %.2f s, taunts=%d" % [index+1,fps,s.elapsed,s.taunts])

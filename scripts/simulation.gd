@@ -34,6 +34,9 @@ var hop_time: float = -1.0
 var hop_from: float = 0.0
 var hop_to: float = 0.0
 var footstep: float = 0.0
+var torch_lit: bool = true
+var noise: float = 0.0
+var alert_time: float = 0.0
 func reset(data: Dictionary, number: int) -> void:
  level = data.duplicate(true)
  index = number
@@ -64,6 +67,9 @@ func reset(data: Dictionary, number: int) -> void:
  was_water_crouch = false
  hop_time = -1.0
  footstep = 0.0
+ torch_lit=true
+ noise=0.0
+ alert_time=0.0
  events.clear()
 func mock() -> void:
  if taunt_cooldown <= 0:
@@ -75,6 +81,21 @@ func step(dt: float, input: Dictionary) -> void:
  if won: return
  elapsed += dt
  taunt_cooldown -= dt
+ if alert_time>0:
+  alert_time=maxf(0,alert_time-dt)
+  if alert_time<=0:
+   pos=Vector2(float(level.start),P.FLOOR-P.BODY_SIZE.y)
+   vel=Vector2.ZERO
+   grounded=true
+   height=P.BODY_SIZE.y
+   crouch=false
+   noise=0.0
+   coyote=P.COYOTE_TIME
+   buffer=0.0
+  return
+ if input.get("interact",false) and level.has("torch") and absf(pos.x+13-float(level.torch))<60:
+  torch_lit=not torch_lit
+  events.append("torch")
  if input.get("eyes", false):
   eyes = not eyes
   events.append("eyes")
@@ -102,7 +123,7 @@ func step(dt: float, input: Dictionary) -> void:
   footstep += dt
   if footstep > (0.42 if crouch else 0.28):
    footstep = 0.0
-   events.append("step")
+   events.append("quiet_step" if crouch else "step")
  if boulder >= 0 and pos.y + height > P.FLOOR - 76 + 6 and pos.x + 26 > boulder - 38 and pos.x < boulder + 38:
   var old_boulder: float = boulder
   if pos.x + 13 < boulder:
@@ -124,9 +145,18 @@ func step(dt: float, input: Dictionary) -> void:
    vel.y = 0.0
    grounded = true
  var center := pos + Vector2(13, height / 2)
+ if level.rule=="noise":
+  var target_noise: float=Rules.noise_target(absf(direction)>0.05,crouch,not grounded)
+  noise=move_toward(noise,target_noise,dt*1.8)
+  if absf(center.x-float(level.guardian))<340 and noise>=0.65:
+   alert_time=0.65
+   mock()
+   events.append("bark")
+   return
  if has_fruit and not ate:
   var distance: float = fruit.distance_to(center)
   var flee: bool = Rules.fruit_flees(level.rule, distance - (150.0 if fleeing else 0.0), fruit.x - center.x, face, eyes, crouch)
+  if level.rule=="shadow": flee=Rules.shadow_flees(center.x,home.x,float(level.torch),torch_lit)
   if flee and not fleeing: mock()
   fleeing = flee
   var target: Vector2 = home

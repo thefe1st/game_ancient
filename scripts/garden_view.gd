@@ -6,7 +6,7 @@ const GOLD := Color("e9ae5b")
 var sim: RefCounted
 var seconds: float = 0.0
 func _process(delta: float) -> void:
- seconds += delta
+ if sim==null or get_parent().screen=="play": seconds += delta
  queue_redraw()
 func _draw() -> void:
  draw_rect(Rect2(0, 0, 960, 540), Color("d98a4e"))
@@ -19,9 +19,25 @@ func _draw() -> void:
   draw_rect(Rect2(x - 8, 205, 39, 10), Color(0.1,0.06,0.04,0.15))
  draw_rect(Rect2(0, 440, 960, 100), INK)
  meander(0, 30)
- meander(487, 26)
- draw_line(Vector2(0,463),Vector2(960,463),CLAY,2)
+ meander(457, 20)
+ draw_line(Vector2(0,480),Vector2(960,480),CLAY,1)
  if sim == null: return
+ if int(sim.level.get("act",0))==1:
+  for i in range(22):
+   draw_rect(Rect2(0,110+i*15,960,15),Color("b99472").lerp(Color("967252"),float(i)/22))
+  for x in [100,420,810]:
+   draw_arc(Vector2(x,290),116,PI,TAU,36,Color(0.10,0.06,0.04,0.17),12,true)
+   draw_line(Vector2(x-116,290),Vector2(x-116,440),Color(0.10,0.06,0.04,0.17),12)
+   draw_line(Vector2(x+116,290),Vector2(x+116,440),Color(0.10,0.06,0.04,0.17),12)
+ if sim.level.rule=="shadow":
+  torch()
+  if sim.torch_lit:
+   var hero_x: float=sim.pos.x+13
+   var side: float=1.0 if hero_x>=float(sim.level.torch) else -1.0
+   var tip: float=clampf(hero_x+side*240,20,940)
+   draw_colored_polygon(PackedVector2Array([Vector2(hero_x-10,440),Vector2(hero_x+10,440),Vector2(tip+30,342),Vector2(tip-22,342)]),Color(0.10,0.06,0.04,0.72))
+   draw_circle(Vector2(tip,317),22,Color(0.10,0.06,0.04,0.72))
+ if sim.level.rule=="noise": cerberus()
  for platform in sim.level.platforms:
   var rectangle := Rect2(platform[0], platform[1], platform[2], 12)
   draw_rect(rectangle, INK)
@@ -73,7 +89,7 @@ func tree() -> void:
   draw_line(p+Vector2(-7,0),p+Vector2(8,-3),CLAY,1)
 func fruit() -> void:
  var p: Vector2 = sim.fruit
- if sim.level.rule == "mirror": draw_line(Vector2(p.x,145),p-Vector2(0,13),INK,1)
+ if sim.level.rule in ["mirror","shadow"]: draw_line(Vector2(p.x,145),p-Vector2(0,13),INK,1)
  draw_circle(p,14,INK)
  draw_arc(p,9,3.5,4.7,12,CREAM,1.5,true)
  draw_line(p-Vector2(0,12),p-Vector2(1,21),INK,3)
@@ -99,3 +115,38 @@ func person(p: Vector2, facing: int, opacity: float) -> void:
  draw_line(p+Vector2(8,18),p+Vector2(17,h-17),detail,1.2)
  if sim.eyes: draw_line(head+Vector2(facing*5,-1),head+Vector2(facing*8,-1),detail,1)
  else: draw_circle(head+Vector2(facing*6,-1),1.3,detail)
+
+func torch() -> void:
+ var x: float=sim.level.torch
+ draw_line(Vector2(x,430),Vector2(x,364),INK,7)
+ draw_arc(Vector2(x,359),13,0,PI,20,INK,5,true)
+ if sim.torch_lit:
+  var wobble: float=0.0 if Settings.reduced_motion else sin(seconds*5)*3
+  draw_circle(Vector2(x,349),38,Color(0.96,0.75,0.36,0.14))
+  draw_colored_polygon(PackedVector2Array([Vector2(x-10,356),Vector2(x-4,340),Vector2(x+wobble,324),Vector2(x+11,355)]),GOLD)
+  draw_line(Vector2(x-3,351),Vector2(x,337),CREAM,3)
+ else:
+  draw_line(Vector2(x-10,345),Vector2(x+10,345),INK,2)
+  draw_circle(Vector2(x,356),4,CREAM)
+func cerberus() -> void:
+ var x: float=sim.level.guardian
+ draw_rect(Rect2(x-66,340,138,10),INK)
+ draw_line(Vector2(x-58,350),Vector2(x-58,376),INK,5)
+ draw_line(Vector2(x+63,350),Vector2(x+63,376),INK,5)
+ draw_rect(Rect2(x-35,301,70,26),INK)
+ for offset in [-25,20]:
+  draw_line(Vector2(x+offset,324),Vector2(x+offset,339),INK,7)
+ draw_polyline(PackedVector2Array([Vector2(x+33,307),Vector2(x+53,291),Vector2(x+56,273)]),INK,5,true)
+ for i in range(3):
+  var head:=Vector2(x-35+i*24,284-i*4)
+  draw_line(head+Vector2(0,11),Vector2(x-25+i*20,310),INK,10,true)
+  draw_circle(head,13,INK)
+  draw_colored_polygon(PackedVector2Array([head+Vector2(-8,-7),head+Vector2(-11,-24),head+Vector2(2,-10)]),INK)
+  draw_rect(Rect2(head-Vector2(21,1),Vector2(16,9)),INK)
+  if sim.alert_time>0:
+   draw_circle(head+Vector2(-6,-2),2.5,CREAM)
+   draw_line(head+Vector2(-25,3),head+Vector2(-34,-3),CREAM,2)
+  else: draw_line(head+Vector2(-9,-1),head+Vector2(-3,-1),CREAM,1.3)
+ draw_rect(Rect2(x-66,354,138,13),INK)
+ draw_rect(Rect2(x-64,356,134*sim.noise,9),GOLD if sim.noise<0.65 else Color("cc5838"))
+ if sim.noise>=0.65: draw_line(Vector2(x+82,350),Vector2(x+82,361),INK,3)

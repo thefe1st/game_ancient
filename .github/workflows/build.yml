@@ -46,6 +46,10 @@ jobs:
           mkdir -p build/windows build/linux
           Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-release Windows build/windows/Tantalus.exe
           Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-release Linux build/linux/Tantalus.x86_64
+      - name: Include engine license notices
+        run: |
+          cp -r docs/licenses build/windows/licenses
+          cp -r docs/licenses build/linux/licenses
       - uses: actions/upload-artifact@v4
         with:
           name: Tantalus-M1-Windows

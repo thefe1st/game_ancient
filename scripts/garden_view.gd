@@ -24,7 +24,7 @@ func _draw() -> void:
  if sim == null: return
  if int(sim.level.get("act",0))>=1:
   for i in range(22):
-   draw_rect(Rect2(0,110+i*15,960,15),Color("b99472").lerp(Color("967252"),float(i)/22))
+   draw_rect(Rect2(0,110+i*15,960,15),(Color("879c99").lerp(Color("4d6469"),float(i)/22) if int(sim.level.get("act",0))==3 else Color("b99472").lerp(Color("967252"),float(i)/22)))
   for x in [100,420,810]:
    draw_arc(Vector2(x,290),116,PI,TAU,36,Color(0.10,0.06,0.04,0.17),12,true)
    draw_line(Vector2(x-116,290),Vector2(x-116,440),Color(0.10,0.06,0.04,0.17),12)
@@ -76,7 +76,7 @@ func _draw() -> void:
     var angle: float=spoke*TAU/6+(0 if Settings.reduced_motion else seconds*0.5)
     draw_line(Vector2(x,y+39),Vector2(x,y+39)+Vector2(cos(angle),sin(angle))*30,CREAM,1.5)
   else: draw_line(Vector2(x+25,y+3),Vector2(x+45,y+30),GOLD,3)
- if sim.level.has("light_receiver") or sim.level.has("plate") or sim.level.has("vessel_source"):
+ if sim.level.has("light_receiver") or sim.level.has("plate") or sim.level.has("vessel_source") or sim.level.has("echo_power"):
   light_surfaces()
  if sim.level.has("light_receiver"):
   var x: float=sim.level.light_receiver[0]
@@ -107,6 +107,7 @@ func _draw() -> void:
   draw_arc(center,30,0.3,5.7,32,CREAM,1.5,true)
   var angle: float = sim.boulder_rotation
   draw_line(center,center+Vector2(cos(angle),sin(angle))*26,CREAM,2)
+ if sim.level.get("echo_enabled",false): echo_objects()
  if sim.has_fruit and not sim.ate: fruit()
  person(sim.pos,sim.face,1.0)
  if sim.vessel_carried: vessel()
@@ -149,21 +150,21 @@ func fruit() -> void:
   draw_line(p+Vector2(4,10),p+Vector2(8,16),INK,3)
   draw_circle(p+Vector2(-4,-2),2,CREAM)
   draw_circle(p+Vector2(5,-2),2,CREAM)
-func person(p: Vector2, facing: int, opacity: float) -> void:
- var h: float = sim.height
- var color := Color(INK,opacity)
+func person(p: Vector2, facing: int, opacity: float, body_height: float=-1, closed: int=-1, ghost: bool=false) -> void:
+ var h: float = sim.height if body_height<0 else body_height
+ var color := Color(Color("a9dfd5") if ghost else INK,opacity)
  var detail := Color(CREAM,opacity)
  var head := p+Vector2(13,8)
  draw_circle(head,9,color)
  draw_line(head+Vector2(facing*5,0),head+Vector2(facing*12,3),color,3)
  draw_rect(Rect2(p+Vector2(6,17),Vector2(14,h-32)),color)
- var phase: float = 0.0 if Settings.reduced_motion else sin(seconds*12)*5*minf(1,absf(sim.vel.x)/130)
+ var phase: float = 0.0 if Settings.reduced_motion or ghost else sin(seconds*12)*5*minf(1,absf(sim.vel.x)/130)
  draw_line(p+Vector2(9,h-16),p+Vector2(7+phase,h),color,5,true)
  draw_line(p+Vector2(18,h-16),p+Vector2(20-phase,h),color,5,true)
  draw_line(p+Vector2(18,20),p+Vector2(13+facing*20,30),color,4,true)
  draw_line(p+Vector2(9,20),p+Vector2(13-facing*13,34),color,4,true)
  draw_line(p+Vector2(8,18),p+Vector2(17,h-17),detail,1.2)
- if sim.eyes: draw_line(head+Vector2(facing*5,-1),head+Vector2(facing*8,-1),detail,1)
+ if (sim.eyes if closed<0 else closed==1): draw_line(head+Vector2(facing*5,-1),head+Vector2(facing*8,-1),detail,1)
  else: draw_circle(head+Vector2(facing*6,-1),1.3,detail)
 
 func torch() -> void:
@@ -197,6 +198,9 @@ func cerberus() -> void:
   draw_circle(head,13,INK)
   draw_colored_polygon(PackedVector2Array([head+Vector2(-8,-7),head+Vector2(-11,-24),head+Vector2(2,-10)]),INK)
   draw_rect(Rect2(head-Vector2(21,1),Vector2(16,9)),INK)
+  if sim.guardian_distracted:
+   draw_arc(head+Vector2(-22,-2),9,2.4,3.9,12,Color("a9dfd5"),2,true)
+   draw_arc(head+Vector2(-22,-2),16,2.4,3.9,12,Color("a9dfd5"),1,true)
   if sim.alert_time>0:
    draw_circle(head+Vector2(-6,-2),2.5,CREAM)
    draw_line(head+Vector2(-25,3),head+Vector2(-34,-3),CREAM,2)
@@ -222,3 +226,35 @@ func vessel() -> void:
  if sim.vessel_water>0:
   var h: float=sim.vessel_water*17
   draw_rect(Rect2(center+Vector2(-7,8-h),Vector2(14,h)),Color("91b3b0"))
+
+func echo_objects() -> void:
+ for i in range(sim.level.get("echo_plates",[]).size()):
+  var plate: Array=sim.level.echo_plates[i]
+  var active: bool=sim.plate_states[i]
+  var color: Color=GOLD if active else CREAM
+  draw_rect(Rect2(plate[0]-plate[2],plate[1]-5,plate[2]*2,5),color,active,-1.0 if active else 1.5)
+  for dot in range(i+1): draw_circle(Vector2(plate[0]-i*4+dot*8,plate[1]-10),2,color)
+ var x: float=sim.level.exit
+ draw_rect(Rect2(x-22,352,44,88),Color(INK,0.35))
+ draw_arc(Vector2(x,353),22,PI,TAU,24,CREAM,3,true)
+ draw_line(Vector2(x-22,353),Vector2(x-22,440),CREAM,3)
+ draw_line(Vector2(x+22,353),Vector2(x+22,440),CREAM,3)
+ if not sim.echo_gate_open:
+  for bar in range(4): draw_line(Vector2(x-15+bar*10,350),Vector2(x-15+bar*10,440),INK,4)
+  draw_line(Vector2(x-20,398),Vector2(x+20,398),GOLD,3)
+ else:
+  draw_polyline(PackedVector2Array([Vector2(x-10,395),Vector2(x+9,395),Vector2(x+2,388),Vector2(x+9,395),Vector2(x+2,402)]),GOLD,3,true)
+ if sim.level.has("amphora") and not sim.relic_collected:
+  var a: Array=sim.level.amphora
+  var p:=Vector2(a[0],a[1])
+  draw_circle(p,12,GOLD)
+  draw_rect(Rect2(p+Vector2(-5,-21),Vector2(10,17)),GOLD)
+  draw_line(p+Vector2(-8,-21),p+Vector2(8,-21),CREAM,2)
+  for side in [-1,1]: draw_arc(p+Vector2(side*10,-7),7,0,TAU,20,CREAM,2,true)
+  draw_line(p+Vector2(-8,0),p+Vector2(8,0),INK,2)
+ if sim.echo.active:
+  var frame: Dictionary=sim.echo.ghost
+  person(frame.pos,int(frame.face),0.7,float(frame.height),1 if frame.eyes else 0,true)
+  draw_arc(frame.pos+Vector2(13,float(frame.height)),18,0,PI,20,Color("a9dfd5"),2,true)
+ if sim.echo.recording:
+  draw_circle(sim.pos+Vector2(13,-10),4,Color("ffb273"))

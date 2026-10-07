@@ -27,6 +27,9 @@ var run_seconds: float=0.0
 var assisted_run: bool=false
 var input_lock: int=0
 var quitting: bool=false
+var room_index: int=0
+var chapter_taunts: int=0
+var chapter_relics: Array=[]
 func _ready() -> void:
  get_tree().auto_accept_quit=false
  levels=Catalog.load_levels()
@@ -54,6 +57,7 @@ func create_hud() -> void:
  subtitle=label_at(Rect2(40,84,670,24),16,Color("1b120c"))
  status=label_at(Rect2(700,43,220,64),16,Color("1b120c"))
  status.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+ status.clip_text=true
  message=label_at(Rect2(40,117,560,32),18,Color("f3dcc0"))
  message.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  hint_label=label_at(Rect2(40,156,560,108),18,Color("f3dcc0"))
@@ -163,6 +167,7 @@ func scroll_box(box: VBoxContainer, height: int=270) -> VBoxContainer:
  scroll.add_child(content)
  return content
 func show_menu() -> void:
+ if screen=="play": save_checkpoint()
  screen="menu"
  binding_action=""
  garden.sim=null
@@ -184,12 +189,15 @@ func show_menu() -> void:
 func show_levels(act: int=0) -> void:
  screen="levels"
  var box:=overlay(Settings.text("levels"))
- var tabs:=HBoxContainer.new()
+ var tabs:=VBoxContainer.new()
  box.add_child(tabs)
- for i in range(3):
-  var number: int=i
-  button(tabs,Settings.text("act_short_%d"%i),func(): show_levels(number),i==act)
- var list:=scroll_box(box,264)
+ for row in range(2):
+  var group:=HBoxContainer.new()
+  tabs.add_child(group)
+  for col in range(2):
+   var number: int=row*2+col
+   button(group,Settings.text("act_short_%d"%number),func(): show_levels(number),number==act)
+ var list:=scroll_box(box,212)
  for i in range(levels.size()):
   if int(levels[i].get("act",0))!=act: continue
   var number: int=i
@@ -197,26 +205,41 @@ func show_levels(act: int=0) -> void:
   button(list,"%02d   %s%s"%[i+1,Settings.text("level_%d"%i),best],func(): start_level(number),i>SaveManager.unlocked)
  button(box,Settings.text("back"),show_menu)
  if not focus_first(list): focus_first(tabs)
-func start_level(number: int) -> void:
+func start_level(number: int, new_chapter: bool=false) -> void:
  clear_panel()
  current=clampi(number,0,levels.size()-1)
- sim.reset(levels[current],current)
+ room_index=0
+ chapter_taunts=0
+ chapter_relics=[]
+ run_seconds=0
+ assisted_run=Settings.slow_mode
+ if is_chapter():
+  if new_chapter: SaveManager.escape_state=SaveManager.fresh_escape()
+  var saved: Dictionary=SaveManager.escape_state
+  room_index=clampi(int(saved.room),0,levels[current].rooms.size()-1)
+  run_seconds=float(saved.seconds)
+  chapter_taunts=int(saved.taunts)
+  chapter_relics=saved.relics.duplicate()
+  assisted_run=assisted_run or bool(saved.assisted)
+  sim.reset(levels[current].rooms[room_index],current)
+  sim.relic_collected=room_index in chapter_relics
+ else: sim.reset(levels[current],current)
  garden.sim=sim
  screen="play"
  hud.visible=true
  hint_visible=false
  taunt_timer=0
  toast=""
- run_seconds=0
- assisted_run=Settings.slow_mode
  input_lock=2
  apply_hud_style()
+ if is_chapter(): save_checkpoint()
  update_hud()
 func pause_menu() -> void:
+ if screen=="play": save_checkpoint()
  screen="pause"
  var box:=overlay(Settings.text("pause"),Settings.text("level_%d"%current))
  button(box,Settings.text("resume"),resume)
- button(box,Settings.text("restart"),func(): start_level(current))
+ button(box,Settings.text("restart_room" if is_chapter() else "restart"),restart_current)
  button(box,Settings.text("controls_menu"),func(): show_controls("pause"))
  button(box,Settings.text("settings"),func(): show_settings("pause"))
  button(box,Settings.text("menu"),show_menu)
@@ -230,9 +253,11 @@ func resume() -> void:
  update_hud()
 func show_win() -> void:
  screen="win"
- var save_error: Error=SaveManager.record(current,run_seconds,sim.taunts,assisted_run)
+ var total: int=chapter_taunts+sim.taunts if is_chapter() else sim.taunts
+ if is_chapter(): save_checkpoint()
+ var save_error: Error=SaveManager.record(current,run_seconds,total,assisted_run)
  var final: bool=current==levels.size()-1
- var box:=overlay(Settings.text("done" if final else "won"),"%.1f s · %s: %d%s"%[run_seconds,Settings.text("taunts"),sim.taunts," · "+Settings.text("assisted") if assisted_run else ""])
+ var box:=overlay(Settings.text("done" if final else "won"),"%.1f s · %s: %d%s"%[run_seconds,Settings.text("taunts"),total," · "+Settings.text("assisted") if assisted_run else ""])
  if save_error!=OK:
   var warning:=Label.new()
   warning.text=Settings.text("saved_error")
@@ -240,10 +265,10 @@ func show_win() -> void:
  if not final: button(box,Settings.text("next"),func(): start_level(current+1))
  else:
   var ending:=Label.new()
-  ending.text=Settings.text("ending")
+  ending.text=Settings.text("escape_ending")+" · %d/3"%chapter_relics.size() if is_chapter() else Settings.text("ending")
   ending.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
   box.add_child(ending)
- button(box,Settings.text("restart"),func(): start_level(current))
+ button(box,Settings.text("restart"),func(): start_level(current,true))
  button(box,Settings.text("menu"),show_menu)
  focus_first(box)
 func show_slots() -> void:
@@ -271,7 +296,7 @@ func show_controls(origin: String="menu") -> void:
  screen="controls"
  var box:=overlay(Settings.text("controls_menu"),Settings.text("controls_caption"))
  var list:=scroll_box(box,260)
- for key in ["torch_combo","vessel_controls"]:
+ for key in ["torch_combo","echo_controls","vessel_controls"]:
   var row:=Label.new()
   row.text=format_hint(Settings.text(key))
   row.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -397,6 +422,7 @@ func capture_binding(action: String, notice: String="") -> void:
  focus_later(button(box,Settings.text("cancel"),show_bindings))
 func finish() -> void:
  if quitting: return
+ if screen=="play": save_checkpoint()
  quitting=true
  AudioManager.stop_all()
  await get_tree().create_timer(0.1).timeout
@@ -436,7 +462,7 @@ func _unhandled_input(event: InputEvent) -> void:
   else: show_menu()
   get_viewport().set_input_as_handled()
  elif event.is_action_pressed("game_restart") and screen in ["play","pause","win"]:
-  start_level(current)
+  restart_current()
  elif event.is_action_pressed("game_hint") and screen=="play": hint_visible=not hint_visible
  elif event.is_action_pressed("game_mute") and screen in ["play","pause"]:
   Settings.muted=not Settings.muted
@@ -449,17 +475,25 @@ func _physics_process(delta: float) -> void:
   return
  assisted_run=assisted_run or Settings.slow_mode
  run_seconds+=delta
- var controls: Dictionary={"move":Input.get_axis("game_left","game_right"),"jump":Input.is_action_just_pressed("game_jump"),"eyes":Input.is_action_just_pressed("game_eyes"),"crouch":Input.is_action_pressed("game_crouch"),"back":Input.is_action_pressed("game_backwards"),"interact":Input.is_action_just_pressed("game_interact")}
+ var controls: Dictionary={"move":Input.get_axis("game_left","game_right"),"jump":Input.is_action_just_pressed("game_jump"),"eyes":Input.is_action_just_pressed("game_eyes"),"crouch":Input.is_action_pressed("game_crouch"),"back":Input.is_action_pressed("game_backwards"),"interact":Input.is_action_just_pressed("game_interact"),"echo_record":Input.is_action_just_pressed("game_echo_record"),"echo_play":Input.is_action_just_pressed("game_echo_play")}
  sim.step(delta*(0.7 if Settings.slow_mode else 1.0),controls)
  taunt_timer=maxf(0,taunt_timer-delta)
  for event in sim.events:
   AudioManager.play(event)
+  if event=="amphora" and is_chapter():
+   if room_index not in chapter_relics: chapter_relics.append(room_index)
+   save_checkpoint()
+  if event=="echo_empty":
+   toast=format_hint(Settings.text("echo_empty"))
+   taunt_timer=2.2
   if event=="taunt":
    taunt_timer=2.2
    toast=Settings.text("taunt_%d"%((sim.taunts+current)%5))
  if run_seconds>25 or sim.taunts>=4: hint_visible=true
  update_hud()
- if sim.won: show_win()
+ if sim.won:
+  if is_chapter() and room_index<levels[current].rooms.size()-1: enter_next_room()
+  else: show_win()
 func update_hud() -> void:
  title.text="%02d / %s"%[current+1,Settings.text("level_%d"%current)]
  subtitle.text=Settings.text("sub_%d"%current)
@@ -477,9 +511,15 @@ func update_hud() -> void:
  message.visible=taunt_timer>0
  message.text=toast if taunt_timer>0 else ""
  hint_label.visible=hint_visible
- hint_label.text=Settings.text("hint")+": "+format_hint(Settings.text("hint_%d"%current)) if hint_visible else ""
+ hint_label.text=Settings.text("hint")+": "+format_hint(Settings.text("room_hint_%d"%room_index if is_chapter() else "hint_%d"%current)) if hint_visible else ""
  control_label.text=format_hint(Settings.text("minimal_controls"))
  if gamepad: control_label.text=Settings.text("minimal_pad")
+ if is_chapter():
+  title.text="%d/6 · %s"%[room_index+1,Settings.text("room_%d"%room_index)]
+  subtitle.text=Settings.text("room_sub_%d"%room_index)+" · "+Settings.text("amphoras")+" %d/3"%chapter_relics.size()
+  var echo_status: String=Settings.text("echo_recording")+" %.1f/6s"%sim.echo.duration if sim.echo.recording else Settings.text("echo_holding" if sim.echo.holding else "echo_playing" if sim.echo.active else "echo_ready" if not sim.echo.samples.is_empty() else "echo_idle")
+  status.text=format_hint(echo_status)+"\n"+format_hint(Settings.text("gate_open" if sim.echo_gate_open else "gate_closed"))
+  control_label.text=format_hint(Settings.text("escape_controls"))
 
 func is_playstation() -> bool:
  var name: String=Input.get_joy_name(pad_device).to_lower()
@@ -489,6 +529,43 @@ func format_hint(text: String) -> String:
  for action in Settings.DEFAULT_BINDINGS: tokens[action]=Settings.binding_label(action)
  if gamepad:
   var ps: bool=is_playstation()
-  tokens.merge({"jump":"×" if ps else "A","crouch":"○" if ps else "B","backwards":"L1" if ps else "LB","eyes":"□" if ps else "X","interact":"R1" if ps else "RB","hint":"△" if ps else "Y"},true)
+  tokens.merge({"jump":"×" if ps else "A","crouch":"○" if ps else "B","backwards":"L1" if ps else "LB","eyes":"□" if ps else "X","interact":"R1" if ps else "RB","echo_record":"D-pad ↑","echo_play":"D-pad ↓","hint":"△" if ps else "Y"},true)
  for action in tokens: text=text.replace("{"+str(action)+"}",str(tokens[action]))
  return text
+
+func is_chapter() -> bool:
+ return not levels.is_empty() and current>=0 and current<levels.size() and levels[current].has("rooms")
+func save_checkpoint() -> void:
+ if not is_chapter(): return
+ var error: Error=SaveManager.checkpoint_escape(room_index,chapter_relics,run_seconds,chapter_taunts+sim.taunts,assisted_run)
+ if error!=OK:
+  toast=Settings.text("saved_error")
+  taunt_timer=3.0
+func enter_next_room() -> void:
+ chapter_taunts+=sim.taunts
+ room_index+=1
+ sim.reset(levels[current].rooms[room_index],current)
+ sim.relic_collected=room_index in chapter_relics
+ hint_visible=false
+ taunt_timer=0
+ toast=""
+ input_lock=2
+ save_checkpoint()
+ update_hud()
+func restart_current() -> void:
+ if screen=="win" and is_chapter():
+  start_level(current,true)
+  return
+ if not is_chapter():
+  start_level(current)
+  return
+ chapter_taunts+=sim.taunts
+ sim.reset(levels[current].rooms[room_index],current)
+ sim.relic_collected=room_index in chapter_relics
+ clear_panel()
+ screen="play"
+ hud.visible=true
+ input_lock=2
+ hint_visible=false
+ save_checkpoint()
+ update_hud()

@@ -2,6 +2,7 @@ extends RefCounted
 # Deterministic platform solver, with explicit one-way surfaces. No rendering or input APIs.
 const P = preload("res://scripts/physics_config.gd")
 const Rules = preload("res://scripts/rules.gd")
+const EchoTrack = preload("res://scripts/echo_track.gd")
 const PlatformWorld = preload("res://scripts/platform_world.gd")
 var level: Dictionary
 var index: int
@@ -46,6 +47,11 @@ var interaction_timer: float=0.0
 var vessel_carried: bool=false
 var vessel_water: float=0.0
 var water_delivered: bool=false
+var echo=EchoTrack.new()
+var echo_gate_open: bool=false
+var plate_states: Array[bool]=[]
+var guardian_distracted: bool=false
+var relic_collected: bool=false
 func reset(data: Dictionary, number: int) -> void:
  level = data.duplicate(true)
  index = number
@@ -86,6 +92,11 @@ func reset(data: Dictionary, number: int) -> void:
  vessel_carried=false
  vessel_water=0.0
  water_delivered=false
+ echo.clear()
+ echo_gate_open=false
+ plate_states.clear()
+ guardian_distracted=false
+ relic_collected=false
  world.reset(level)
  update_light()
  events.clear()
@@ -104,6 +115,17 @@ func step(dt: float, input: Dictionary) -> void:
   alert_time=maxf(0,alert_time-dt)
   if alert_time<=0: soft_respawn()
   return
+ if level.get("echo_enabled",false):
+  if input.get("echo_record",false):
+   if echo.recording:
+    echo.stop()
+    events.append("echo_stop")
+   else:
+    echo.begin(echo_frame(input))
+    events.append("echo_start")
+  if input.get("echo_play",false):
+   events.append("echo_play" if echo.play() else "echo_empty")
+  echo.advance(dt)
  if input.get("interact",false) and level.has("torch"):
   interact_torch(bool(input.get("crouch",false)))
  if input.get("interact",false) and level.has("vessel_source"): interact_vessel()
@@ -177,7 +199,8 @@ func step(dt: float, input: Dictionary) -> void:
  if level.has("guardian"):
   var target_noise: float=Rules.noise_target(absf(direction)>0.05,crouch,not grounded)
   noise=move_toward(noise,target_noise,dt*1.8)
-  if absf(center.x-float(level.guardian))<float(level.get("guard_radius",340)) and noise>=0.65:
+  guardian_distracted=echo.active and float(echo.ghost.get("noise",0))>=0.65 and absf(Vector2(echo.ghost.pos).x+13-float(level.guardian))<float(level.get("echo_hearing",440))
+  if not guardian_distracted and absf(center.x-float(level.guardian))<float(level.get("guard_radius",340)) and noise>=0.65:
    alert_time=0.65
    mock()
    events.append("bark")
@@ -228,7 +251,19 @@ func step(dt: float, input: Dictionary) -> void:
     drank = true
     events.append("drink")
   else: drink_timer = maxf(0, drink_timer - dt)
+ if level.has("amphora") and not relic_collected:
+  var relic:=Vector2(level.amphora[0],level.amphora[1])
+  if Rect2(pos-Vector2(10,16),Vector2(46,height+16)).grow(17).has_point(relic):
+   relic_collected=true
+   events.append("amphora")
+ if level.get("echo_enabled",false):
+  var was_recording: bool=echo.recording
+  echo.capture(dt,echo_frame(input))
+  if was_recording and not echo.recording: events.append("echo_stop")
+  update_light()
  won = (not has_fruit or ate) and (not level.has("pool") or drank) and (not level.has("vessel_source") or water_delivered) and (not level.has("plate") or world.receiver_active)
+ if level.has("exit"):
+  won=echo_gate_open and absf(pos.x+13-float(level.exit))<58 and grounded and bool(input.get("interact",false))
  if won: events.append("win")
 
 func interact_torch(crouch_command: bool) -> void:
@@ -243,6 +278,7 @@ func interact_torch(crouch_command: bool) -> void:
   torch_x=clampf(pos.x+13+face*24,20,P.WIDTH-20)
  events.append("torch")
 func update_light() -> void:
+ update_echo_plates()
  var was_active: bool=world.receiver_active
  world.receiver_active=false
  if level.has("light_receiver") and torch_lit and not carried_torch:
@@ -250,6 +286,7 @@ func update_light() -> void:
   world.receiver_active=absf(torch_x-float(receiver[0]))<=float(receiver[1])
  if level.has("plate") and boulder>=0: world.receiver_active=absf(boulder-float(level.plate[0]))<=float(level.plate[1])
  if level.has("vessel_source") and water_delivered: world.receiver_active=true
+ if level.get("echo_power",false): world.receiver_active=echo_gate_open
  if world.receiver_active and not was_active: events.append("light")
 func soft_respawn() -> void:
  # Retain collected rewards and placed lights; time/taunts do not reset.
@@ -282,3 +319,21 @@ func interact_vessel() -> void:
    vessel_carried=false
    events.append("drink")
   else: mock()
+
+func echo_frame(input: Dictionary) -> Dictionary:
+ return {"pos":pos,"height":height,"face":face,"eyes":eyes,"grounded":grounded,"noise":Rules.noise_target(absf(float(input.get("move",0)))>0.05,bool(input.get("crouch",false)),not grounded)}
+func update_echo_plates() -> void:
+ plate_states.clear()
+ echo_gate_open=true
+ for plate in level.get("echo_plates",[]):
+  var x: float=float(plate[0])
+  var y: float=float(plate[1])
+  var radius: float=float(plate[2])
+  var pressed: bool=grounded and absf(pos.x+13-x)<=radius and absf(pos.y+height-y)<3
+  if echo.active:
+   var ghost: Dictionary=echo.ghost
+   pressed=pressed or (ghost.get("grounded",false) and absf(Vector2(ghost.pos).x+13-x)<=radius and absf(Vector2(ghost.pos).y+float(ghost.height)-y)<3)
+  if boulder>=0: pressed=pressed or (absf(boulder-x)<=radius and absf(P.FLOOR-y)<3)
+  plate_states.append(pressed)
+  echo_gate_open=echo_gate_open and pressed
+ if level.get("echo_enabled",false) and level.get("require_echo",true): echo_gate_open=echo_gate_open and echo.active

@@ -12,6 +12,7 @@ var load_error: bool = false
 var recovered_backup: bool = false
 var read_only: bool = false
 var last_error: Error = OK
+var escape_state: Dictionary = fresh_escape()
 func _ready() -> void:
  level_count=Catalog.load_levels().size()
  var profile:=ConfigFile.new()
@@ -44,13 +45,14 @@ func read_snapshot(path: String) -> Dictionary:
    if str(key).is_valid_int() and int(key)>=0 and int(key)<level_count and (assisted[key] is float or assisted[key] is int):
     var value: float=float(assisted[key])
     if value>=0 and not is_nan(value) and not is_inf(value): safe_assisted[str(key)]=value
- return {"unlocked":clampi(progress,0,level_count-1),"taunts":maxi(0,taunts),"times":safe_times,"assisted_times":safe_assisted}
+ return {"unlocked":clampi(progress,0,level_count-1),"taunts":maxi(0,taunts),"times":safe_times,"assisted_times":safe_assisted,"escape":sanitize_escape(config.get_value("progress","escape",{}))}
 func load_slot(slot: int) -> void:
  active_slot=clampi(slot,0,2)
  unlocked=0
  total_taunts=0
  best_times={}
  assisted_times={}
+ escape_state=fresh_escape()
  load_error=false
  recovered_backup=false
  read_only=false
@@ -84,6 +86,7 @@ func load_slot(slot: int) -> void:
   total_taunts=data.taunts
   best_times=data.times
   assisted_times=data.assisted_times
+  escape_state=data.get("escape",fresh_escape())
   # Earlier versions capped unlocked at their last level. A completion record
   # opens the appended trial without making the user replay the old finale.
   for times in [best_times,assisted_times]:
@@ -113,6 +116,7 @@ func write_snapshot() -> Error:
  config.set_value("progress","taunts",total_taunts)
  config.set_value("progress","best_times",best_times)
  config.set_value("progress","assisted_times",assisted_times)
+ config.set_value("progress","escape",escape_state)
  var path: String=slot_path(active_slot)
  var error: Error=config.save(path+".tmp")
  if error!=OK: return error
@@ -144,7 +148,29 @@ func reset_active_slot() -> Error:
  total_taunts=0
  best_times={}
  assisted_times={}
+ escape_state=fresh_escape()
  read_only=false
  load_error=false
  recovered_backup=false
+ return flush()
+
+static func fresh_escape() -> Dictionary:
+ return {"room":0,"relics":[],"seconds":0.0,"taunts":0,"assisted":false,"started":false}
+static func sanitize_escape(value: Variant) -> Dictionary:
+ var state: Dictionary=fresh_escape()
+ if value is not Dictionary: return state
+ if value.get("room",0) is int: state.room=clampi(value.get("room",0),0,5)
+ var seconds=value.get("seconds",0.0)
+ if (seconds is float or seconds is int) and not is_nan(float(seconds)) and not is_inf(float(seconds)) and float(seconds)>=0: state.seconds=float(seconds)
+ if value.get("taunts",0) is int: state.taunts=maxi(0,value.get("taunts",0))
+ state.assisted=value.get("assisted",false)==true
+ state.started=value.get("started",false)==true
+ var relics=value.get("relics",[])
+ if relics is Array:
+  for item in relics:
+   if item is int and item in [0,2,3] and item not in state.relics: state.relics.append(item)
+ return state
+func checkpoint_escape(room: int, relics: Array, seconds: float, taunts: int, assisted: bool) -> Error:
+ if read_only: return ERR_FILE_CANT_WRITE
+ escape_state=sanitize_escape({"room":room,"relics":relics,"seconds":seconds,"taunts":taunts,"assisted":assisted,"started":true})
  return flush()

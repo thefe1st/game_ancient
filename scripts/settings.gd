@@ -3,10 +3,10 @@ signal changed
 const DEFAULT_BINDINGS: Dictionary = {
  "left": KEY_A, "right": KEY_D, "jump": KEY_SPACE, "crouch": KEY_S,
  "backwards": KEY_SHIFT, "eyes": KEY_E, "interact": KEY_G,
- "hint": KEY_H, "restart": KEY_R, "mute": KEY_M
+ "hint": KEY_H, "restart": KEY_R, "mute": KEY_M, "echo_record": KEY_T, "echo_play": KEY_F
 }
 const ALIASES: Dictionary = {"left":[KEY_LEFT], "right":[KEY_RIGHT], "jump":[KEY_W,KEY_UP], "crouch":[KEY_DOWN]}
-const PAD_BUTTONS: Dictionary = {"left":JOY_BUTTON_DPAD_LEFT,"right":JOY_BUTTON_DPAD_RIGHT,"jump":JOY_BUTTON_A,"crouch":JOY_BUTTON_B,"backwards":JOY_BUTTON_LEFT_SHOULDER,"eyes":JOY_BUTTON_X,"interact":JOY_BUTTON_RIGHT_SHOULDER,"hint":JOY_BUTTON_Y,"pause":JOY_BUTTON_START}
+const PAD_BUTTONS: Dictionary = {"left":JOY_BUTTON_DPAD_LEFT,"right":JOY_BUTTON_DPAD_RIGHT,"jump":JOY_BUTTON_A,"crouch":JOY_BUTTON_B,"backwards":JOY_BUTTON_LEFT_SHOULDER,"eyes":JOY_BUTTON_X,"interact":JOY_BUTTON_RIGHT_SHOULDER,"hint":JOY_BUTTON_Y,"pause":JOY_BUTTON_START,"echo_record":JOY_BUTTON_DPAD_UP,"echo_play":JOY_BUTTON_DPAD_DOWN}
 var language: String = "ru"
 var muted: bool = false
 var reduced_motion: bool = false
@@ -46,6 +46,18 @@ func reload() -> void:
    var candidate: Dictionary=DEFAULT_BINDINGS.duplicate()
    for action in DEFAULT_BINDINGS:
     if stored.has(action): candidate[action]=stored[action]
+   # Preserve old remaps even when T/F already belong to an existing action.
+   for added in ["echo_record","echo_play"]:
+    if not stored.has(added):
+     var used: Array=[]
+     for other in candidate:
+      if other!=added:
+       used.append(candidate[other])
+       if candidate[other]==DEFAULT_BINDINGS[other]: used.append_array(ALIASES.get(other,[]))
+     for fallback in [DEFAULT_BINDINGS[added],KEY_T,KEY_F,KEY_V,KEY_B,KEY_N,KEY_J,KEY_K,KEY_L,KEY_U,KEY_I,KEY_O,KEY_P]:
+      if fallback not in used:
+       candidate[added]=fallback
+       break
    if validate_bindings(candidate): bindings=candidate
 
  load_language()

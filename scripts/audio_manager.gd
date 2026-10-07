@@ -40,6 +40,11 @@ func synth(event: String) -> AudioStreamWAV:
  var duration: float = 0.2
  var frequency: float = 260.0
  match event:
+  "echo_start": duration=0.3; frequency=330
+  "echo_stop": duration=0.2; frequency=220
+  "echo_play": duration=0.5; frequency=550
+  "echo_empty": duration=0.12; frequency=110
+  "amphora": duration=0.65; frequency=880
   "win": duration = 0.9
   "taunt": duration = 0.65
   "eat": duration = 0.12

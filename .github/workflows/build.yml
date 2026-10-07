@@ -60,6 +60,13 @@ jobs:
           export XDG_DATA_HOME="$(mktemp -d)"
           Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script res://tests/m4_tests.gd 2>&1 | tee m4.log
           if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' m4.log; then exit 1; fi
+      - name: M5 echo chapter and checkpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_DATA_HOME="$(mktemp -d)"
+          Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script res://tests/m5_tests.gd 2>&1 | tee m5.log
+          if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' m5.log; then exit 1; fi
       - name: Export Windows and Linux
         shell: bash
         run: |
@@ -73,9 +80,9 @@ jobs:
           cp -r docs/licenses build/linux/licenses
       - uses: actions/upload-artifact@v4
         with:
-          name: Tantalus-0.4.0-Windows
+          name: Tantalus-0.5.0-Windows
           path: build/windows/
       - uses: actions/upload-artifact@v4
         with:
-          name: Tantalus-0.4.0-Linux
+          name: Tantalus-0.5.0-Linux
           path: build/linux/

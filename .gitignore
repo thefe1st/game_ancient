@@ -1,0 +1,10 @@
+# Godot imports and local generated output
+.godot/
+build/
+*.zip
+*.exe
+*.pck
+*.x86_64
+*.tmp
+.env
+steam_appid.txt

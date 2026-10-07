@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Тантал — прототип</title>
+<style>
+html,body{margin:0;background:#1b120c;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+canvas{width:100%;max-width:1200px;aspect-ratio:16/9;display:block;outline:none;cursor:pointer}
+</style></head><body>
+<canvas id="c" width="960" height="540" tabindex="0"></canvas>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d');
+const W=960,H=540,GROUND=440,INK='#1b120c',CLAY='#c8683a',CREAM='#f3dcc0',SERIF='Georgia, "Times New Roman", serif';
+let AC=null,muted=false;
+function ac(){if(!AC){AC=new (window.AudioContext||window.webkitAudioContext)();}if(AC.state==='suspended')AC.resume();return AC;}
+function tone(f,d,type='triangle',v=.15,t0=0,f2){if(muted||!AC)return;const t=AC.currentTime+t0,o=AC.createOscillator(),gn=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);gn.gain.setValueAtTime(v,t);gn.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(gn).connect(AC.destination);o.start(t);o.stop(t+d+.05);}
+function noise(d,v=.1,fr=800,t0=0,q=1){if(muted||!AC)return;const t=AC.currentTime+t0,n=AC.sampleRate*d,b=AC.createBuffer(1,n,AC.sampleRate),a=b.getChannelData(0);for(let i=0;i<n;i++)a[i]=Math.random()*2-1;const s=AC.createBufferSource(),fl=AC.createBiquadFilter(),gn=AC.createGain();s.buffer=b;fl.type='bandpass';fl.frequency.value=fr;fl.Q.value=q;gn.gain.setValueAtTime(v,t);gn.gain.exponentialRampToValueAtTime(.0001,t+d);s.connect(fl).connect(gn).connect(AC.destination);s.start(t);}
+const LYRE=[293.7,329.6,349.2,392,440,493.9,523.3,587.3,659.3];
+function pluck(f,t0=0,v=.12){tone(f,1.4,'triangle',v,t0);tone(f*2,.5,'sine',v*.35,t0);}
+const SFX={
+ jump:()=>tone(260,.18,'square',.05,0,520),
+ step:()=>noise(.05,.035,1800,0,2),
+ flee:()=>{tone(400,.35,'sine',.08,0,1400);},
+ laugh:()=>{for(let i=0;i<4;i++){tone(200-i*12,.12,'sawtooth',.045,.25+i*.15,150-i*12);noise(.1,.03,900,.25+i*.15,3);}},
+ win:()=>[0,2,4,7,8].forEach((n,i)=>pluck(LYRE[n],i*.11,.13)),
+ start:()=>[0,4,7].forEach((n,i)=>pluck(LYRE[n],i*.04,.08)),
+ eyes:o=>tone(o?330:220,.25,'sine',.06,0,o?440:150),
+ drink:()=>tone(500+Math.random()*400,.08,'sine',.06,0,900+Math.random()*300),
+ hop:()=>tone(180,.3,'square',.05,0,700),
+ rumble:()=>noise(.18,.06,120,0,.7),
+ eat:()=>{noise(.12,.12,2500,0,1.5);tone(600,.15,'triangle',.06,.05,300);},
+ end:()=>[0,2,4,5,7,8,7,4,8].forEach((n,i)=>pluck(LYRE[n],i*.16,.12))};
+let ambT=0;function ambient(dt){if(muted||!AC||scene!=='play')return;ambT-=dt;if(ambT<0){ambT=2.5+Math.random()*3;pluck(LYRE[[0,2,4,7][Math.random()*4|0]]/2,0,.035);}}
+const keys={};
+addEventListener('keydown',e=>{ac();if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();if(!keys[e.code])press(e.code);keys[e.code]=true;});
+addEventListener('keyup',e=>keys[e.code]=false);
+cv.addEventListener('click',()=>{ac();cv.focus();if(scene==='title')start(0);});
+
+const TAUNTS=['Зевс хохочет.','Гермес записал это в анналы.','Даже Сизиф над тобой смеётся.','Олимп аплодирует. Не тебе.','Почти! Нет.','Боги благодарят за развлечение.','Аид делает ставки.','Ещё одна вечность впереди.'];
+const LEVELS=[
+ {name:'I. Голод',sub:'Плод висит прямо над тобой. Просто возьми его.',hint:'Плод бежит от жадного взгляда. Повернись к нему спиной и пяться (Shift).',
+  start:120,fruit:[720,305],speed:520,tree:true,plats:[],
+  flee:(d,pc)=>d<230&&!P.eyes&&Math.sign(F.x-pc.x)===P.face,
+  target:pc=>({x:F.hx+(F.hx>pc.x?50:-50),y:F.hy-190})},
+ {name:'II. Взгляд',sub:'Этот плод умнее. Затылком его не обмануть.',hint:'Не смотри вовсе. Закрой глаза (E) и иди на аромат.',
+  start:100,fruit:[640,250],speed:520,tree:true,plats:[{x:560,w:150,y:350}],
+  flee:(d)=>d<280&&!P.eyes,
+  target:()=>({x:F.hx,y:F.hy-170})},
+ {name:'III. Жажда',sub:'Вода по самый подбородок. Нагнись и пей.',hint:'Вода уходит от желания. Встань в воду, закрой глаза (E) и замри.',
+  start:110,pool:[330,640],plats:[]},
+ {name:'IV. Бегство',sub:'Плод отрастил ножки.',hint:'Он замечает лишь тех, кто стоит в полный рост. Пригнись (S).',
+  start:430,fruit:[760,GROUND-16],speed:270,legs:true,plats:[],stay:true,
+  flee:(d)=>d<210&&!P.crouch,
+  target:pc=>{const s=F.x>=pc.x?1:-1;return{x:clamp(pc.x+s*300,50,910),y:GROUND-16}}},
+ {name:'V. Отражение',sub:'Плод тянется не к тебе, а к твоему отражению.',hint:'Встань туда, где ты и отражение — одно целое. Камень посередине знает.',
+  start:120,fruit:[840,300],speed:330,thread:true,mirror:true,plats:[],
+  flee:(d,pc)=>d<190&&Math.abs(F.x-pc.x)>45,
+  target:pc=>({x:W-pc.x,y:300})},
+ {name:'VI. Камень Сизифа',sub:'Сизиф одолжил тебе свой камень. Плод висит слишком высоко.',hint:'Толкай камень спиной вперёд (Shift), забирайся на него и прыгай, не глядя на плод.',
+  start:80,fruit:[760,225],speed:520,tree:true,boulder:200,plats:[],
+  flee:(d,pc)=>d<240&&!P.eyes&&Math.sign(F.x-pc.x)===P.face,
+  target:pc=>({x:F.hx+(F.hx>pc.x?50:-50),y:F.hy-180})},
+ {name:'VII. Пир',sub:'Последнее испытание: и съесть, и выпить.',hint:'Всё, чему ты научился: закрой глаза, замри в воде — и прыгни за плодом вслепую.',
+  start:110,fruit:[560,300],speed:520,tree:true,pool:[330,640],both:true,plats:[],
+  flee:(d)=>d<280&&!P.eyes,
+  target:()=>({x:F.hx,y:F.hy-170})}
+];
+let B=null,ate=false,drank=false,pushing=false,stepPh=0;
+let scene='title',li=0,L,P,F,T=0,lt=0,attempts=0,total=0,msg=null,idle=0,drink=0,wy=402,winT=0,runTime=0,sparks=[];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lvlParam=+new URLSearchParams(location.search).get('level');
+
+function start(i){li=i;L=LEVELS[i];scene='play';lt=0;attempts=0;idle=0;drink=0;wy=402;msg=null;sparks=[];
+ B=L.boulder?{x:L.boulder,rot:0}:null;ate=false;drank=false;L.wasC=false;SFX.start();
+ P={x:L.start,y:GROUND-56,w:26,h:56,vx:0,vy:0,on:true,face:1,crouch:false,eyes:false,walk:0};
+ F=L.fruit?{x:L.fruit[0],y:L.fruit[1],hx:L.fruit[0],hy:L.fruit[1],fleeing:false,hop:null}:null;}
+function press(c){
+ if(scene==='title'&&(c==='Enter'||c==='Space')){runTime=0;total=0;start(0);return;}
+ if(scene==='end'&&(c==='Enter'||c==='KeyR')){runTime=0;total=0;start(0);return;}
+ if(scene==='win'&&(c==='Enter'||c==='Space')){next();return;}
+ if(c==='KeyM')muted=!muted;
+ if(scene==='play'){if(c==='KeyE'){P.eyes=!P.eyes;SFX.eyes(P.eyes);}if(c==='KeyR')start(li);if(c==='KeyH')lt=Math.max(lt,99);}
+}
+function next(){if(li+1<LEVELS.length)start(li+1);else{scene='end';SFX.end();}}
+function taunt(){attempts++;total++;SFX.flee();SFX.laugh();msg={t:TAUNTS[(total*3+li)%TAUNTS.length],ttl:2.2};}
+
+function update(dt){
+ T+=dt;if(msg&&(msg.ttl-=dt)<0)msg=null;
+ sparks=sparks.filter(s=>(s.l-=dt)>0);sparks.forEach(s=>{s.x+=s.vx*dt;s.y+=s.vy*dt;s.vy+=300*dt});
+ ambient(dt);
+ if(scene==='win'){winT+=dt;if(winT>2.6)next();return;}
+ if(scene!=='play')return;
+ lt+=dt;runTime+=dt;
+ const left=keys.KeyA||keys.ArrowLeft,right=keys.KeyD||keys.ArrowRight,jump=keys.KeyW||keys.ArrowUp||keys.Space,down=keys.KeyS||keys.ArrowDown,back=keys.ShiftLeft||keys.ShiftRight;
+ const dir=(right?1:0)-(left?1:0);
+ idle=(dir||jump||down)?0:idle+dt;
+ P.crouch=!!down&&P.on;
+ const nh=P.crouch?34:56,bot=P.y+P.h;P.h=nh;P.y=bot-nh;
+ P.vx=dir*(P.crouch?115:back?130:230);if(dir&&!back)P.face=dir;
+ if(dir&&P.on)P.walk+=dt*(P.crouch?6:back?8:12);
+ if(jump&&P.on&&!P.crouch){P.vy=-640;P.on=false;SFX.jump();}
+ if(dir&&P.on&&!P.crouch){const ph=Math.floor(P.walk/Math.PI);if(ph!==stepPh){stepPh=ph;SFX.step();}}
+ P.vy+=1900*dt;P.x=clamp(P.x+P.vx*dt,20,W-20-P.w);
+ const wasP=pushing;pushing=false;
+ if(B){const top=GROUND-76;if(P.y+P.h>top+6&&P.x+P.w>B.x-38&&P.x<B.x+38){const ox=B.x;
+   if(P.x+P.w/2<B.x){if(P.on&&P.vx>0)B.x=clamp(P.x+P.w+38,60,900);P.x=Math.min(P.x,B.x-38-P.w);}
+   else{if(P.on&&P.vx<0)B.x=clamp(P.x-38,60,900);P.x=Math.max(P.x,B.x+38);}
+   if(B.x!==ox){B.rot+=(B.x-ox)/38;pushing=true;if(Math.random()<dt*6)SFX.rumble();}}}
+ const prev=P.y+P.h;P.y+=P.vy*dt;P.on=false;
+ for(const p of [{x:0,w:W,y:GROUND},...L.plats,...(B?[{x:B.x-30,w:60,y:GROUND-76}]:[])])
+  if(P.vy>=0&&prev<=p.y+0.5&&P.y+P.h>=p.y&&P.x+P.w>p.x&&P.x<p.x+p.w){P.y=p.y-P.h;P.vy=0;P.on=true;}
+ const pc={x:P.x+P.w/2,y:P.y+P.h/2};
+ if(F&&!ate){
+  const d=Math.hypot(F.x-pc.x,F.y-pc.y);
+  if(F.hop){F.hop.t+=dt*1.5;const k=Math.min(1,F.hop.t);F.x=F.hop.x0+(F.hop.x1-F.hop.x0)*k;F.y=GROUND-16-Math.sin(Math.PI*k)*170;if(k>=1)F.hop=null;}
+  else{
+   const fl=L.flee(d-(F.fleeing?150:0),pc);if(fl&&!F.fleeing&&T-(F.lt||-9)>1.5){taunt();F.lt=T;}F.fleeing=fl;
+   let tg=(fl||L.mirror)?L.target(pc):(L.stay?{x:F.x,y:F.y}:{x:F.hx,y:F.hy});
+   if(L.legs&&fl&&d<110&&(F.x<=52||F.x>=908)){const s=F.x>=pc.x?1:-1;F.hop={x0:F.x,x1:clamp(pc.x-s*280,50,910),t:0};SFX.hop();}
+   const dx=tg.x-F.x,dy=tg.y-F.y,m=Math.hypot(dx,dy),st=(fl?L.speed:120)*dt;
+   if(m>0){const k=Math.min(1,st/m);F.x+=dx*k;F.y+=dy*k;}
+  }
+  const cx=clamp(F.x,P.x-10,P.x+P.w+10),cy=clamp(F.y,P.y-16,P.y+P.h);
+  if(Math.hypot(F.x-cx,F.y-cy)<18){if(L.both){ate=true;SFX.eat();msg={t:drank?'':'Плод съеден! Теперь — пить.',ttl:2.2};if(drank)win();}else win();}
+ }
+ if(L.pool){
+  const inP=pc.x>L.pool[0]+10&&pc.x<L.pool[1]-10;
+  let tg=402,sp=90;
+  if(inP&&P.crouch){tg=436;sp=400;}else if(inP&&P.eyes&&idle>2.5){tg=355;sp=16;}
+  if(inP&&P.crouch&&!L.wasC)taunt();L.wasC=inP&&P.crouch;
+  wy+=clamp(tg-wy,-sp*dt,sp*dt);
+  if(inP&&wy<P.y+15&&!drank){drink+=dt;if(Math.random()<dt*8)SFX.drink();if(drink>1.2){if(L.both){drank=true;drink=0;msg={t:ate?'':'Напился! Теперь — плод.',ttl:2.2};if(ate)win();}else win();}}else drink=Math.max(0,drink-dt);
+ }
+}
+function win(){scene='win';winT=0;SFX.win();const x=F?F.x:P.x+13,y=F?F.y:P.y+15;
+ for(let i=0;i<40;i++)sparks.push({x,y,vx:(Math.random()-.5)*400,vy:-Math.random()*400,l:1+Math.random()});}
+
+/* ---------- drawing ---------- */
+function meander(y,h){g.fillStyle=INK;g.fillRect(0,y,W,h);const s=h-14,y0=y+7;g.strokeStyle=CLAY;g.lineWidth=2.5;
+ g.beginPath();for(let x=-((T*0)%s);x<W;x+=s){const P_=(a,b)=>[x+a*s,y0+b*s];
+  g.moveTo(...P_(0,1));g.lineTo(...P_(0,0));g.lineTo(...P_(.78,0));g.lineTo(...P_(.78,.74));g.lineTo(...P_(.26,.74));g.lineTo(...P_(.26,.38));g.lineTo(...P_(.52,.38));
+  g.moveTo(...P_(0,1));g.lineTo(...P_(1,1));}g.stroke();}
+function bg(){const gr=g.createLinearGradient(0,0,0,GROUND);gr.addColorStop(0,'#d98a4e');gr.addColorStop(1,CLAY);g.fillStyle=gr;g.fillRect(0,0,W,H);
+ g.fillStyle='rgba(27,18,12,.10)';g.beginPath();g.moveTo(0,GROUND);[[90,330],[200,250],[290,300],[420,190],[520,280],[640,230],[760,300],[880,240],[960,290]].forEach(p=>g.lineTo(...p));g.lineTo(W,GROUND);g.fill();
+ g.fillStyle='rgba(243,220,192,.5)';g.beginPath();g.moveTo(400,198);g.lineTo(420,190);g.lineTo(440,200);g.lineTo(428,206);g.lineTo(412,202);g.fill();
+ meander(0,38);g.fillStyle=INK;g.fillRect(0,GROUND,W,H-GROUND);meander(GROUND+30,40);
+ g.fillStyle=CLAY;g.fillRect(0,GROUND+24,W,2);}
+function tree(){g.strokeStyle=INK;g.lineCap='round';g.lineWidth=26;g.beginPath();g.moveTo(870,GROUND);g.quadraticCurveTo(880,250,840,110);g.stroke();
+ g.lineWidth=10;const fx=ate?F.hx:F.x,fy=ate?F.hy:F.y;g.beginPath();g.moveTo(850,150);g.quadraticCurveTo(F.hx+40,F.hy-150,fx+4,fy-14);g.stroke();
+ g.fillStyle=INK;for(let i=0;i<9;i++){const a=i*0.7,x=840+Math.cos(a)*90-40,y=90+Math.sin(a*1.3)*35;g.beginPath();g.ellipse(x,y,26,11,a,0,7);g.fill();}
+ for(let i=0;i<5;i++){const k=i/5,x=850+(fx-850)*k,y=150+(fy-14-150)*k-30*Math.sin(k*3);g.beginPath();g.ellipse(x,y-8,14,6,-.5,0,7);g.fill();}}
+function fruit(){if(ate)return;const{x,y}=F;
+ if(L.thread){g.strokeStyle=INK;g.lineWidth=1.5;g.beginPath();g.moveTo(x,38);g.lineTo(x,y-14);g.stroke();}
+ if(L.legs){g.strokeStyle=INK;g.lineWidth=3;const s=Math.sin(T*(F.fleeing||F.hop?22:3))*6;g.beginPath();g.moveTo(x-4,y+10);g.lineTo(x-6+s,y+18);g.moveTo(x+4,y+10);g.lineTo(x+6-s,y+18);g.stroke();}
+ g.fillStyle=INK;g.beginPath();g.arc(x,y,14,0,7);g.fill();g.beginPath();g.moveTo(x-6,y-12);g.lineTo(x-4,y-20);g.lineTo(x,y-14);g.lineTo(x+4,y-20);g.lineTo(x+6,y-12);g.fill();
+ g.strokeStyle=CREAM;g.lineWidth=1.5;g.beginPath();g.arc(x,y,9,3.6,4.6);g.stroke();
+ g.fillStyle='#a8352a';g.beginPath();g.arc(x+4,y+3,3,0,7);g.fill();
+ if(L.legs){g.fillStyle=CREAM;const e=F.fleeing||F.hop?3:2;g.beginPath();g.arc(x-4,y-2,e,0,7);g.arc(x+5,y-2,e,0,7);g.fill();}}
+function player(){const{x,y,w,h}=P,cx=x+w/2,cr=P.crouch,f=P.face;
+ g.strokeStyle=INK;g.fillStyle=INK;g.lineCap='round';g.lineWidth=6;
+ const hy=y+9,hip=y+h-(cr?10:20),sw=Math.sin(P.walk)*(P.on?9:3);
+ g.beginPath();if(cr){g.moveTo(cx,hip);g.lineTo(cx+f*10,y+h-6);g.lineTo(cx+f*4,y+h);g.moveTo(cx,hip);g.lineTo(cx-f*8,y+h);}
+ else{g.moveTo(cx,hip);g.lineTo(cx+sw,y+h);g.moveTo(cx,hip);g.lineTo(cx-sw,y+h);}g.stroke();
+ g.beginPath();g.moveTo(cx-6,hy+9);g.lineTo(cx+6,hy+9);g.lineTo(cx+11,hip+6);g.lineTo(cx-11,hip+6);g.fill();
+ g.beginPath();g.arc(cx,hy,9,0,7);g.fill();g.beginPath();g.moveTo(cx+f*2,hy+4);g.quadraticCurveTo(cx+f*12,hy+10,cx+f*3,hy+14);g.fill();
+ let tx=cx+f*8,ty=hy+30;
+ if(F){const d=Math.hypot(F.x-cx,F.y-hy);if(d<160){const a=Math.atan2(F.y-hy-10,F.x-cx);tx=cx+Math.cos(a)*24;ty=hy+10+Math.sin(a)*24;}}
+ if(L.pool&&P.crouch){tx=cx+f*18;ty=y+h-2;}
+ g.lineWidth=4.5;g.beginPath();g.moveTo(cx,hy+12);g.lineTo(tx,ty);g.stroke();
+ g.strokeStyle=CREAM;g.fillStyle=CREAM;g.lineWidth=1.5;const ex=cx+f*4,ey=hy-1;
+ if(P.eyes){g.beginPath();g.moveTo(ex-2.5,ey);g.lineTo(ex+2.5,ey);g.stroke();}else{g.beginPath();g.arc(ex,ey,1.8,0,7);g.fill();}
+ g.beginPath();g.moveTo(cx-6,hy+16);g.lineTo(cx+6,hy+16);g.stroke();
+ g.beginPath();g.arc(cx,hy-2,9,Math.PI*1.05,Math.PI*1.95);g.stroke();}
+function pool(){const[a,b]=L.pool;g.fillStyle=INK;
+ g.beginPath();g.ellipse(a,GROUND-6,22,14,0,0,7);g.ellipse(b,GROUND-6,22,14,0,0,7);g.fill();
+ g.fillStyle='rgba(40,78,110,.85)';g.fillRect(a,wy,b-a,GROUND-wy);
+ g.strokeStyle=CREAM;g.lineWidth=1.5;g.beginPath();for(let x=a;x<=b;x+=6)g.lineTo(x,wy+Math.sin(x/14+T*3)*2);g.stroke();
+ g.beginPath();for(let x=a+20;x<b-20;x+=40){g.moveTo(x,wy+18);g.quadraticCurveTo(x+10,wy+14,x+20,wy+18);}g.stroke();}
+function boulder(){if(!B)return;const y=GROUND-38;g.fillStyle=INK;g.beginPath();g.arc(B.x,y,38,0,7);g.fill();g.strokeStyle=CLAY;g.lineWidth=2;
+ for(let i=0;i<3;i++){const a=B.rot+i*2.1;g.beginPath();g.arc(B.x,y,24,a,a+1.1);g.stroke();}g.beginPath();g.arc(B.x,y,33,0,7);g.stroke();}
+function omphalos(){g.fillStyle=INK;g.beginPath();g.ellipse(W/2,GROUND,16,20,0,Math.PI,0);g.fill();g.strokeStyle=CLAY;g.lineWidth=1.5;g.beginPath();g.moveTo(W/2-10,GROUND-10);g.lineTo(W/2+10,GROUND-10);g.stroke();}
+function reflection(){g.save();g.translate(W,0);g.scale(-1,1);g.globalAlpha=.33;player();g.restore();g.globalAlpha=1;}
+function plats(){g.fillStyle=INK;for(const p of L.plats){g.fillRect(p.x,p.y,p.w,GROUND-p.y);g.fillStyle=CLAY;for(let i=0;i<3;i++)g.fillRect(p.x+10,p.y+14+i*24,p.w-20,2);g.fillStyle=INK;}}
+function txt(s,x,y,size,col=INK,al='center',st=''){g.font=`${st} ${size}px ${SERIF}`;g.fillStyle=col;g.textAlign=al;g.fillText(s,x,y);}
+function blind(){g.fillStyle='rgba(10,6,4,.93)';g.fillRect(0,38,W,GROUND-38);
+ g.strokeStyle='rgba(200,104,58,.35)';g.lineWidth=2;g.beginPath();g.moveTo(0,GROUND);g.lineTo(W,GROUND);for(const p of L.plats){g.moveTo(p.x,p.y);g.lineTo(p.x+p.w,p.y);}g.stroke();
+ g.strokeStyle='rgba(243,220,192,.35)';g.strokeRect(P.x,P.y,P.w,P.h);
+ if(F)for(let i=0;i<14;i++){const k=((T*0.4+i/14)%1),x=F.x+Math.sin(i*2.1+T*1.5)*30*k,y=F.y-k*60+Math.cos(i)*8;g.fillStyle=`rgba(234,194,107,${(1-k)*.8})`;g.beginPath();g.arc(x,y,2.5,0,7);g.fill();}
+ txt('глаза закрыты',W/2,70,16,'rgba(243,220,192,.6)','center','italic');}
+function hud(){g.fillStyle=INK;g.fillRect(12,8,200,24);g.fillRect(W-200,8,188,24);txt(L.name,24,26,18,CREAM,'left','bold');txt('Насмешек богов: '+attempts,W-24,26,16,CREAM,'right');if(L.both){g.fillStyle=INK;g.fillRect(W/2-85,8,170,24);txt((ate?'✓':'○')+' плод   '+(drank?'✓':'○')+' вода',W/2,26,16,CREAM,'center');}
+ txt('←→ / AD идти · ↑ / W / Пробел прыжок · S пригнуться · Shift пятиться · E глаза · R заново · H подсказка · M звук'+(muted?' (выкл)':''),W/2,GROUND+20,13,'rgba(243,220,192,.7)');
+ if(lt<3.2){g.globalAlpha=Math.min(1,3.2-lt);txt(L.name,W/2,150,44,INK,'center','bold');txt(L.sub,W/2,186,20,INK,'center','italic');g.globalAlpha=1;}
+ if(lt>25||attempts>=4){const s='Оракул шепчет: «'+L.hint+'»';g.font=`italic 16px ${SERIF}`;const w=g.measureText(s).width+36;g.fillStyle='rgba(27,18,12,.85)';g.fillRect(W/2-w/2,52,w,30);txt(s,W/2,73,16,'#eac26b','center','italic');}
+ if(msg&&msg.t){g.font=`italic 20px ${SERIF}`;const w=g.measureText(msg.t).width+40;g.globalAlpha=Math.min(1,msg.ttl*2);g.fillStyle=INK;g.fillRect(W/2-w/2,224,w,36);txt(msg.t,W/2,249,20,CREAM,'center','italic');g.globalAlpha=1;}
+ if(L.pool&&drink>0){g.fillStyle=INK;g.fillRect(P.x-8,P.y-22,42,6);g.fillStyle='#5E9FE8';g.fillRect(P.x-8,P.y-22,42*Math.min(1,drink/1.2),6);}}
+function drawSparks(){for(const s of sparks){g.fillStyle=`rgba(234,194,107,${Math.min(1,s.l)})`;g.fillRect(s.x,s.y,4,4);}}
+function title(){bg();g.fillStyle=INK;g.beginPath();g.ellipse(W/2,300,170,120,0,0,7);g.fill();
+ g.save();g.translate(W/2,300);g.strokeStyle=CLAY;g.lineWidth=3;g.beginPath();g.ellipse(0,0,186,136,0,0,7);g.stroke();g.restore();
+ txt('ТАНТАЛ',W/2,300,72,CLAY,'center','bold');txt('или как обмануть богов',W/2,340,22,CREAM,'center','italic');
+ txt('Нажми Enter или кликни, чтобы начать',W/2,140,22,INK,'center','italic');
+ txt('Сын Зевса похитил нектар богов. Теперь он вечно голоден и вечно жаждет.',W/2,108,17,INK);}
+function end(){bg();txt('Тантал сыт и пьян.',W/2,170,46,INK,'center','bold');txt('Олимп в ярости.',W/2,215,26,INK,'center','italic');
+ const m=Math.floor(runTime/60),s=String(Math.floor(runTime%60)).padStart(2,'0');
+ txt('Насмешек богов за игру: '+total+'   ·   Время: '+m+':'+s,W/2,280,20,INK);
+ txt('Зевс уже готовит камень побольше. Сизиф передаёт привет.',W/2,330,18,INK,'center','italic');
+ txt('Enter или R — сыграть снова',W/2,390,18,INK);drawSparks();}
+function draw(){
+ if(scene==='title')return title();if(scene==='end')return end();
+ bg();if(L.mirror)omphalos();if(L.tree)tree();plats();boulder();if(F)fruit();if(L.mirror)reflection();player();if(L.pool)pool();
+ if(scene==='play'&&P.eyes)blind();drawSparks();hud();
+ if(scene==='win'){g.fillStyle='rgba(27,18,12,.75)';g.fillRect(0,200,W,110);txt('Ты обманул богов!',W/2,252,40,'#eac26b','center','bold');txt(li+1<LEVELS.length?'Enter — дальше':'Enter — финал',W/2,288,18,CREAM,'center','italic');}}
+let last=performance.now();
+function loop(n){const dt=clamp((n-last)/1000,0,0.033);last=n;update(dt);draw();requestAnimationFrame(loop);}
+if(lvlParam)start(lvlParam-1);
+window.__B=()=>B&&B.x;window.__g={get s(){return{scene,li,P,F,wy,attempts}},start,keys};
+requestAnimationFrame(loop);cv.focus();
+</script></body></html>

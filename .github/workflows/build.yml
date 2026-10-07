@@ -1,0 +1,56 @@
+name: Test and build Tantalus
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  game:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Godot and templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 -o godot.zip https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          unzip -q godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.5.1-stable_linux.x86_64
+          echo /tmp/godot >> "$GITHUB_PATH"
+          curl -fL --retry 3 -o templates.tpz https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz
+          unzip -q templates.tpz -d /tmp/templates
+          mkdir -p ~/.local/share/godot/export_templates/4.5.1.stable
+          mv /tmp/templates/templates/* ~/.local/share/godot/export_templates/4.5.1.stable/
+          rm godot.zip templates.tpz
+      - name: Import and test
+        shell: bash
+        run: |
+          set -euo pipefail
+          Godot_v4.5.1-stable_linux.x86_64 --headless --path . --editor --import --quit 2>&1 | tee import.log
+          if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' import.log; then exit 1; fi
+          Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script res://tests/run_tests.gd 2>&1 | tee tests.log
+          if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' tests.log; then exit 1; fi
+      - name: Runtime UI and save tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_DATA_HOME="$(mktemp -d)"
+          Godot_v4.5.1-stable_linux.x86_64 --headless --path . --script res://tests/runtime_tests.gd 2>&1 | tee runtime.log
+          if grep -E 'SCRIPT ERROR|Parse Error|ERROR:' runtime.log; then exit 1; fi
+      - name: Export Windows and Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/windows build/linux
+          Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-release Windows build/windows/Tantalus.exe
+          Godot_v4.5.1-stable_linux.x86_64 --headless --path . --export-release Linux build/linux/Tantalus.x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tantalus-M1-Windows
+          path: build/windows/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tantalus-M1-Linux
+          path: build/linux/

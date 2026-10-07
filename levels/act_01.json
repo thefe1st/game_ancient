@@ -1,0 +1,83 @@
+[
+  {
+    "id": "hunger",
+    "rule": "back",
+    "start": 120,
+    "fruit": [
+      720,
+      305
+    ],
+    "platforms": []
+  },
+  {
+    "id": "gaze",
+    "rule": "eyes",
+    "start": 100,
+    "fruit": [
+      640,
+      250
+    ],
+    "platforms": [
+      [
+        560,
+        350,
+        150
+      ]
+    ]
+  },
+  {
+    "id": "thirst",
+    "rule": "water",
+    "start": 110,
+    "pool": [
+      330,
+      640
+    ],
+    "platforms": []
+  },
+  {
+    "id": "escape",
+    "rule": "sneak",
+    "start": 430,
+    "fruit": [
+      760,
+      424
+    ],
+    "platforms": []
+  },
+  {
+    "id": "reflection",
+    "rule": "mirror",
+    "start": 120,
+    "fruit": [
+      840,
+      300
+    ],
+    "platforms": []
+  },
+  {
+    "id": "stone",
+    "rule": "stone",
+    "start": 80,
+    "fruit": [
+      760,
+      225
+    ],
+    "boulder": 200,
+    "platforms": []
+  },
+  {
+    "id": "feast",
+    "rule": "feast",
+    "start": 110,
+    "fruit": [
+      560,
+      300
+    ],
+    "pool": [
+      330,
+      640
+    ],
+    "platforms": []
+  }
+]
